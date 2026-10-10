@@ -34,3 +34,6 @@ supabase/functions/.env.*
 # ...pero las migraciones y el seed sí van al repo
 !supabase/migrations/*.sql
 !supabase/seed.sql
+
+# Python
+__pycache__/
