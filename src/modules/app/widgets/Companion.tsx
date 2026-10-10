@@ -71,6 +71,8 @@ export function Companion({ goal, slot, intro }: { goal: number; slot: DaySlot; 
   const [cursor, setCursor] = useState({ k: '', i: 0 })
   const [turns, setTurns] = useState<Turn[]>([])
   const [mode, setMode] = useState<'brief' | 'chat'>('brief')
+  // El chat (sugerencias + campo) solo aparece si se interactúa con el mensaje.
+  const [open, setOpen] = useState(false)
   const [input, setInput] = useState('')
   const [asking, setAsking] = useState(false)
   const [react, setReact] = useState<Mood | null>(null)
@@ -155,6 +157,7 @@ export function Companion({ goal, slot, intro }: { goal: number; slot: DaySlot; 
     if (!text || asking) return
     setInput('')
     setMode('chat')
+    setOpen(true)
     const history = [...turns.flatMap((t) => (t.a ? [{ role: 'user' as const, content: t.q }, { role: 'assistant' as const, content: t.a }] : [])), { role: 'user' as const, content: text }]
     setTurns((ts) => [...ts, { q: text }])
     setAsking(true)
@@ -167,6 +170,15 @@ export function Companion({ goal, slot, intro }: { goal: number; slot: DaySlot; 
       setAsking(false)
     }
   }
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open])
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
@@ -188,26 +200,15 @@ export function Companion({ goal, slot, intro }: { goal: number; slot: DaySlot; 
   const enter = intro ? 'bubble-pop' : 'intro-soft'
 
   return (
-    <section
-      aria-label="Mini, tu asistente"
-      className={`rounded-[26px] border border-[#cfe3da] bg-gradient-to-b from-[#e3f1ea] to-white p-3.5 shadow-[0_14px_36px_-24px_rgba(14,90,71,0.55)] ${intro ? 'intro-rise' : 'intro-soft'}`}
-      style={{ ['--d' as string]: '300ms' }}
-    >
-      <div className="flex items-start gap-1.5">
-        <div className="-mt-2 -ml-2 shrink-0">
-          <MiniBot
-            mood={mood}
-            intro={intro}
-            size={108}
-            reacting={react === 'wink' || react === 'excited'}
-            onClick={tapBot}
-            label={chatting ? 'Mini. Tocá para volver a los avisos' : notices.length > 1 ? `Mini. Tocá para el siguiente aviso (${idx + 1} de ${notices.length})` : 'Mini, tu asistente'}
-          />
-        </div>
-
-        <div className={`relative min-w-0 flex-1 rounded-[18px] border border-[#d6e7de] bg-white p-3 ${enter}`} style={{ ['--d' as string]: intro ? '900ms' : '0ms' }}>
-          {/* Cola del globo hacia Mini */}
-          <span aria-hidden="true" className="absolute top-6 -left-[7px] h-3.5 w-3.5 rotate-45 rounded-[3px] border-b border-l border-[#d6e7de] bg-white" />
+    <section aria-label="Mini, tu asistente" className={intro ? 'intro-rise' : 'intro-soft'} style={{ ['--d' as string]: '300ms' }}>
+      <div className="flex items-end gap-1">
+        {/* Globo: lo único visible por defecto. Tocar el mensaje abre el chat. */}
+        <div
+          className={`relative min-w-0 flex-1 rounded-[20px] border border-hair bg-white p-3.5 shadow-[0_14px_32px_-20px_rgba(27,31,28,0.4)] ${enter}`}
+          style={{ ['--d' as string]: intro ? '900ms' : '0ms' }}
+        >
+          {/* Cola del globo hacia Mini (abajo a la derecha) */}
+          <span aria-hidden="true" className="absolute -right-[7px] bottom-9 h-3.5 w-3.5 rotate-45 rounded-[3px] border-t border-r border-hair bg-white" />
           <div className="mb-1 flex items-center gap-1.5 text-[0.6875rem] font-bold tracking-[0.06em] text-brand uppercase">
             {(asking || (briefLoading && !briefing)) && <Loader2 size={11} className="animate-spin" aria-hidden="true" />}
             Mini · {status}
@@ -218,20 +219,32 @@ export function Companion({ goal, slot, intro }: { goal: number; slot: DaySlot; 
             {speech.title ? `${speech.title}${/[.!?…]$/.test(speech.title) ? '' : '.'} ` : ''}
             {speech.text}
           </span>
-          <div aria-hidden="true">
-            {speech.title && (
-              <p className="text-[1rem] leading-snug font-bold text-ink">
-                {titleShown}
-                {!typed.done && typed.shown.length <= speech.title.length && <span className="type-caret" />}
-              </p>
-            )}
-            <p className={`${speech.title ? 'mt-0.5 text-[0.875rem] text-ink-2' : 'text-[0.9375rem] text-ink'} leading-snug whitespace-pre-line`}>
-              {textShown}
-              {!typed.done && typed.shown.length > speech.title.length && <span className="type-caret" />}
-            </p>
-          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen((o) => !o)
+              flash('happy')
+            }}
+            aria-expanded={open}
+            aria-controls="mini-chat"
+            aria-label={open ? 'Cerrar el chat con Mini' : 'Responderle a Mini'}
+            className="block w-full rounded-xl text-left"
+          >
+            <span aria-hidden="true">
+              {speech.title && (
+                <span className="block text-[1rem] leading-snug font-bold text-ink">
+                  {titleShown}
+                  {!typed.done && typed.shown.length <= speech.title.length && <span className="type-caret" />}
+                </span>
+              )}
+              <span className={`block ${speech.title ? 'mt-0.5 text-[0.875rem] text-ink-2' : 'text-[0.9375rem] text-ink'} leading-snug whitespace-pre-line`}>
+                {textShown}
+                {!typed.done && typed.shown.length > speech.title.length && <span className="type-caret" />}
+              </span>
+            </span>
+          </button>
 
-          <div className="mt-2 flex items-center justify-between gap-2">
+          <div className="mt-2.5 flex items-center justify-between gap-2">
             {!chatting && notices.length > 1 ? (
               <span className="flex gap-1" aria-hidden="true">
                 {notices.map((m, i) => (
@@ -241,57 +254,91 @@ export function Companion({ goal, slot, intro }: { goal: number; slot: DaySlot; 
             ) : (
               <span />
             )}
-            <Link
-              to={speech.to}
-              onClick={() => flash('excited')}
-              className="flex h-9 items-center gap-0.5 rounded-full bg-brand-tint pr-2 pl-3 text-[0.8125rem] font-bold text-brand"
-            >
-              {chatting ? 'Abrir chat' : 'Ver'} <ChevronRight size={16} aria-hidden="true" />
-            </Link>
+            <div className="flex items-center gap-1.5">
+              {!open && (
+                <button
+                  type="button"
+                  onClick={() => setOpen(true)}
+                  aria-controls="mini-chat"
+                  aria-expanded={false}
+                  className="flex h-9 items-center gap-1 rounded-full px-2.5 text-[0.8125rem] font-semibold text-ink-2 hover:bg-paper"
+                >
+                  <MessageCircle size={15} aria-hidden="true" /> Responder
+                </button>
+              )}
+              <Link
+                to={speech.to}
+                onClick={() => flash('excited')}
+                className="flex h-9 items-center gap-0.5 rounded-full bg-brand-tint pr-2 pl-3 text-[0.8125rem] font-bold text-brand"
+              >
+                {chatting ? 'Abrir chat' : 'Ver'} <ChevronRight size={16} aria-hidden="true" />
+              </Link>
+            </div>
           </div>
+        </div>
+
+        {/* Mini, afuera del globo, en la esquina derecha */}
+        <div className="-mr-2 -mb-1 shrink-0 self-end">
+          <MiniBot
+            mood={mood}
+            intro={intro}
+            size={96}
+            reacting={react === 'wink' || react === 'excited'}
+            onClick={tapBot}
+            label={chatting ? 'Mini. Tocá para volver a los avisos' : notices.length > 1 ? `Mini. Tocá para el siguiente aviso (${idx + 1} de ${notices.length})` : 'Mini, tu asistente'}
+          />
         </div>
       </div>
 
-      {chatting && !asking && last.proposals?.map((p) => <ProposalCard key={p.id} p={p} />)}
+      {/* Chat: se despliega al interactuar con el mensaje */}
+      {open && (
+        <div id="mini-chat" className="intro-soft mt-2.5 rounded-[20px] border border-hair bg-white p-3" style={{ ['--d' as string]: '0ms' }}>
+          {chatting && !asking && last.proposals?.map((p) => <ProposalCard key={p.id} p={p} />)}
 
-      {chips.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5" aria-label="Preguntas sugeridas">
-          {chips.map((c) => (
+          {chips.length > 0 && (
+            <div className="flex flex-wrap gap-1.5" aria-label="Preguntas sugeridas">
+              {chips.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => void ask(c)}
+                  disabled={asking}
+                  className="h-9 rounded-full border border-hair-strong bg-white px-3 text-[0.8125rem] font-semibold text-ink hover:border-brand disabled:opacity-50"
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <form onSubmit={onSubmit} className="mt-2.5 flex items-center gap-2 rounded-full border border-hair bg-paper py-1 pr-1 pl-3.5 focus-within:border-brand">
+            <MessageCircle size={18} className="shrink-0 text-ink-3" aria-hidden="true" />
+            <label className="sr-only" htmlFor="mini-ask">
+              Preguntale a Mini
+            </label>
+            <input
+              id="mini-ask"
+              autoFocus
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Preguntale algo a Mini…"
+              maxLength={300}
+              className="min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-ink-3 focus-visible:outline-none"
+            />
             <button
-              key={c}
-              type="button"
-              onClick={() => void ask(c)}
-              disabled={asking}
-              className="h-9 rounded-full border border-[#cfe3da] bg-white px-3 text-[0.8125rem] font-semibold text-ink hover:border-brand disabled:opacity-50"
+              type="submit"
+              disabled={!input.trim() || asking}
+              aria-label="Enviar pregunta"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand text-white disabled:opacity-40"
             >
-              {c}
+              {asking ? <Loader2 size={18} className="animate-spin" /> : <Send size={17} />}
             </button>
-          ))}
+          </form>
+          <button type="button" onClick={() => setOpen(false)} className="mx-auto mt-1.5 flex h-9 items-center px-3 text-[0.8125rem] font-semibold text-ink-2">
+            Cerrar
+          </button>
         </div>
       )}
-
-      <form onSubmit={onSubmit} className="mt-2.5 flex items-center gap-2 rounded-full border border-hair bg-white py-1 pr-1 pl-3.5">
-        <MessageCircle size={18} className="shrink-0 text-ink-3" aria-hidden="true" />
-        <label className="sr-only" htmlFor="mini-ask">
-          Preguntale a Mini
-        </label>
-        <input
-          id="mini-ask"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Preguntale algo a Mini…"
-          maxLength={300}
-          className="min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-ink-3"
-        />
-        <button
-          type="submit"
-          disabled={!input.trim() || asking}
-          aria-label="Enviar pregunta"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand text-white disabled:opacity-40"
-        >
-          {asking ? <Loader2 size={18} className="animate-spin" /> : <Send size={17} />}
-        </button>
-      </form>
     </section>
   )
 }
