@@ -44,6 +44,9 @@ export interface Sale {
   tax: number
   total: number
   change_given: number
+  /** Foto del tiquete de la registradora (si la venta vino de un tiquete). */
+  capture_id: string | null
+  ticket_number: string | null
   created_at: string
 }
 
@@ -120,7 +123,7 @@ export interface Capture {
   category: CaptureCategory
   raw_input: string | null
   /** `{ ai?: AiExtraction, applied?: {...} }` (las entradas viejas pueden traer otra forma). */
-  parsed_json: { ai?: AiExtraction; applied?: { po_id: string; at: string } } | null
+  parsed_json: { ai?: AiExtraction; applied?: { po_id?: string; sale_id?: string; at: string } } | null
   /** Ruta dentro del bucket privado 'bitacora' (se abre con URL firmada). */
   file_path: string | null
   file_name: string | null
@@ -150,9 +153,18 @@ export type Proposal =
     }
   | { id: string; kind: 'receive_invoice'; captura_id: string; resumen: string }
 
-export interface CartLine {
-  product: Product
-  qty: number
+/** Movimiento de efectivo que no es venta: `ingreso` entra a la caja; el resto sale. */
+export type CashKind = 'ingreso' | 'pago_proveedor' | 'gasto' | 'retiro'
+
+export interface CashMovement {
+  id: string
+  shift_id: string | null
+  kind: CashKind
+  amount: number
+  note: string | null
+  supplier_id: string | null
+  created_by: string | null
+  created_at: string
 }
 
 export const IVA_RATE = 0.13

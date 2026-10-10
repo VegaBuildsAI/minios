@@ -7,7 +7,6 @@ import {
   ChevronRight,
   CreditCard,
   NotebookPen,
-  ShoppingCart,
   Sparkles,
   Truck,
   type LucideIcon,
@@ -99,7 +98,7 @@ export function Home() {
           to="/app/caja"
           className="flex h-12 items-center justify-center gap-2 rounded-[14px] bg-marigold text-base font-bold text-ink"
         >
-          <ShoppingCart size={20} aria-hidden="true" /> Cobrar venta
+          <Camera size={20} aria-hidden="true" /> Registrar tiquete
         </Link>
       </section>
 

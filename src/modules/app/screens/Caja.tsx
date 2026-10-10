@@ -1,98 +1,122 @@
-import { useMemo, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Banknote, Check, CreditCard, Minus, NotebookPen, Plus, ScanLine, Search, Smartphone, Trash2, X, type LucideIcon } from 'lucide-react'
 import {
-  useCategories,
-  useCheckout,
+  ArrowDownLeft,
+  ArrowLeft,
+  ArrowUpRight,
+  Camera,
+  ChevronRight,
+  HandCoins,
+  Loader2,
+  Receipt,
+  ShoppingBasket,
+  Truck,
+  Wallet,
+  X,
+  type LucideIcon,
+} from 'lucide-react'
+import {
+  uploadBitacoraFile,
+  useAddCashMovement,
   useCloseShiftMutation,
+  useCreateCapture,
   useOpenShift,
   useOpenShiftMutation,
-  useProducts,
+  useParseCapture,
+  useSuppliers,
+  useTodayCashMovements,
   useTodaySales,
+  useUpdateCapture,
 } from '@/lib/data'
-import { IVA_RATE, formatCRC, type CartLine, type PaymentMethod, type Product } from '@/lib/types'
+import { formatCRC, type CashKind, type PaymentMethod } from '@/lib/types'
+import { Card, Eyebrow } from '../components'
+import { TICKET_MARK, usePendingTickets } from '@/lib/tickets'
+import { TicketSheet } from '../widgets/TicketSheet'
 
-const METHODS: { id: PaymentMethod; label: string; icon: LucideIcon }[] = [
-  { id: 'efectivo', label: 'Efectivo', icon: Banknote },
-  { id: 'sinpe', label: 'SINPE', icon: Smartphone },
-  { id: 'tarjeta', label: 'Tarjeta', icon: CreditCard },
-  { id: 'fiado', label: 'Fiado', icon: NotebookPen },
-]
+const PAY_LABEL: Record<PaymentMethod, string> = { efectivo: 'Efectivo', sinpe: 'SINPE', tarjeta: 'Tarjeta', fiado: 'Fiado' }
+
+const KIND: Record<CashKind, { label: string; icon: LucideIcon; out: boolean; hint: string }> = {
+  gasto: { label: 'Gasto', icon: ShoppingBasket, out: true, hint: 'Ej. productos de limpieza' },
+  pago_proveedor: { label: 'Pago a proveedor', icon: Truck, out: true, hint: 'Ej. factura 1234' },
+  retiro: { label: 'Retiro del dueño', icon: HandCoins, out: true, hint: 'Opcional' },
+  ingreso: { label: 'Entrada de efectivo', icon: Wallet, out: false, hint: 'Ej. fondo para cambio' },
+}
+
+const time = (iso: string) => new Date(iso).toLocaleTimeString('es-CR', { hour: '2-digit', minute: '2-digit' })
 
 export function Caja() {
   const navigate = useNavigate()
-  const { data: products = [], isLoading } = useProducts()
-  const { data: categories = [] } = useCategories()
   const { data: shift } = useOpenShift()
-  const { data: todaySales = [] } = useTodaySales()
-  const checkout = useCheckout()
-  const openShift = useOpenShiftMutation()
-  const closeShift = useCloseShiftMutation()
+  const { data: sales = [] } = useTodaySales()
+  const { data: cash = [] } = useTodayCashMovements()
+  const pending = usePendingTickets()
+  const createCapture = useCreateCapture()
+  const parse = useParseCapture()
+  const archive = useUpdateCapture()
+  const fileRef = useRef<HTMLInputElement>(null)
 
-  const [cat, setCat] = useState<string | null>(null)
-  const [q, setQ] = useState('')
-  const [cart, setCart] = useState<CartLine[]>([])
-  const [sheet, setSheet] = useState(false)
-  const [method, setMethod] = useState<PaymentMethod>('efectivo')
-  const [received, setReceived] = useState('')
-  const [doneSale, setDoneSale] = useState<{ total: number } | null>(null)
+  const [ticketId, setTicketId] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadErr, setUploadErr] = useState<string | null>(null)
+  const [cashSheet, setCashSheet] = useState(false)
   const [turnoSheet, setTurnoSheet] = useState(false)
-  const [openingCash, setOpeningCash] = useState('')
-  const [closingCash, setClosingCash] = useState('')
 
-  const efectivoHoy = todaySales
-    .filter((s) => s.payment_method === 'efectivo' && (!shift || s.shift_id === shift.id))
-    .reduce((s, r) => s + Number(r.total), 0)
-  const expectedCash = (shift?.opening_cash ?? 0) + efectivoHoy
-  const cashDiff = closingCash ? Number(closingCash) - expectedCash : 0
+  // Con turno abierto se cuadra el turno; sin turno, el día.
+  const inShift = <T extends { shift_id: string | null }>(r: T) => !shift || r.shift_id === shift.id
+  const cashSales = sales.filter((s) => s.payment_method === 'efectivo' && inShift(s)).reduce((a, s) => a + Number(s.total), 0)
+  const ins = cash.filter((m) => !KIND[m.kind].out && inShift(m)).reduce((a, m) => a + Number(m.amount), 0)
+  const outs = cash.filter((m) => KIND[m.kind].out && inShift(m)).reduce((a, m) => a + Number(m.amount), 0)
+  const expected = (shift?.opening_cash ?? 0) + cashSales + ins - outs
+  const salesTotal = sales.reduce((a, s) => a + Number(s.total), 0)
 
-  const filtered = useMemo(() => {
-    return products.filter(
-      (p) =>
-        (!cat || p.category_id === cat) &&
-        (!q || p.name.toLowerCase().includes(q.toLowerCase()) || (p.sku ?? '').toLowerCase().includes(q.toLowerCase())),
-    )
-  }, [products, cat, q])
-
-  const add = (p: Product) =>
-    setCart((c) => {
-      const ex = c.find((l) => l.product.id === p.id)
-      if (ex) return c.map((l) => (l.product.id === p.id ? { ...l, qty: l.qty + 1 } : l))
-      return [...c, { product: p, qty: 1 }]
-    })
-  const setQty = (id: string, d: number) =>
-    setCart((c) =>
-      c
-        .map((l) => (l.product.id === id ? { ...l, qty: l.qty + d } : l))
-        .filter((l) => l.qty > 0),
-    )
-  const removeLine = (id: string) => setCart((c) => c.filter((l) => l.product.id !== id))
-
-  const inCart: Record<string, number> = Object.fromEntries(cart.map((l) => [l.product.id, l.qty]))
-  const count = cart.reduce((s, l) => s + l.qty, 0)
-  const subtotal = cart.reduce((s, l) => s + l.product.sale_price * l.qty, 0)
-  const tax = subtotal * IVA_RATE
-  const total = subtotal + tax
-  const change = method === 'efectivo' && received ? Math.max(0, Number(received) - total) : 0
-
-  const cobrar = async () => {
-    if (cart.length === 0) return
-    await checkout.mutateAsync({ cart, paymentMethod: method, shiftId: shift?.id ?? null })
-    setDoneSale({ total })
-    setCart([])
-    setReceived('')
+  const onPhoto = async (files: FileList | null) => {
+    const f = files?.[0]
+    if (fileRef.current) fileRef.current.value = ''
+    if (!f) return
+    setUploadErr(null)
+    setUploading(true)
+    try {
+      const file = await uploadBitacoraFile(f)
+      const id = await createCapture.mutateAsync({ type: 'file', category: 'caja', rawInput: TICKET_MARK, file })
+      setTicketId(id)
+      parse.mutate({ id })
+    } catch (e) {
+      setUploadErr((e as Error).message)
+    } finally {
+      setUploading(false)
+    }
   }
+
+  const feed = [
+    ...sales.map((s) => ({
+      id: s.id,
+      at: s.created_at,
+      icon: Receipt,
+      title: s.ticket_number ? `Tiquete N.° ${s.ticket_number}` : 'Tiquete',
+      sub: `${s.itemCount} producto${s.itemCount === 1 ? '' : 's'} · ${PAY_LABEL[s.payment_method]}`,
+      amount: Number(s.total),
+      out: false,
+    })),
+    ...cash.map((m) => ({
+      id: m.id,
+      at: m.created_at,
+      icon: KIND[m.kind].icon,
+      title: KIND[m.kind].label,
+      sub: m.note ?? 'Efectivo',
+      amount: Number(m.amount),
+      out: KIND[m.kind].out,
+    })),
+  ].sort((a, b) => b.at.localeCompare(a.at))
 
   return (
     <div className="mostrador fixed inset-0 z-50 mx-auto flex max-w-[440px] flex-col bg-paper text-ink">
-      {/* Top bar */}
       <header className="flex items-center gap-2.5 border-b border-hair bg-white px-3 py-3">
         <button onClick={() => navigate('/app')} aria-label="Volver al inicio" className="flex h-11 w-11 items-center justify-center rounded-full text-ink hover:bg-paper-2">
           <ArrowLeft size={22} aria-hidden="true" />
         </button>
         <div className="flex-1">
           <h1 className="font-display-m text-[1.375rem] leading-tight font-bold text-ink">Caja</h1>
-          <div className="text-[0.8125rem] text-ink-2">{shift ? `Turno abierto · ${formatCRC(shift.opening_cash)} apertura` : 'Sin turno abierto'}</div>
+          <div className="text-[0.8125rem] text-ink-2">{shift ? `Turno abierto desde las ${time(shift.opened_at)}` : 'Sin turno abierto'}</div>
         </div>
         <button
           onClick={() => setTurnoSheet(true)}
@@ -104,306 +128,295 @@ export function Caja() {
         </button>
       </header>
 
-      {/* Search + categories */}
-      <div className="px-4 pt-3 pb-2">
-        <label className="mb-2.5 flex h-12 items-center gap-2 rounded-[14px] border border-hair bg-white px-3.5">
-          <Search size={20} className="text-ink-2" aria-hidden="true" />
-          <span className="sr-only">Buscar producto</span>
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar o escanear código"
-            className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-ink-3"
-          />
-          <ScanLine size={20} className="text-brand" aria-hidden="true" />
-        </label>
-        <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <Pill active={cat === null} onClick={() => setCat(null)}>
-            Todos
-          </Pill>
-          {categories.map((c) => (
-            <Pill key={c.id} active={cat === c.id} onClick={() => setCat(c.id)}>
-              {c.name}
-            </Pill>
-          ))}
-        </div>
-      </div>
-
-      {/* Product grid */}
-      <div className="flex-1 overflow-y-auto p-3">
-        {isLoading ? (
-          <div className="py-10 text-center text-ink-3">Cargando productos…</div>
-        ) : (
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-            {filtered.map((p) => {
-              const out = p.stock_qty <= 0
-              return (
-                <button
-                  key={p.id}
-                  disabled={out}
-                  onClick={() => add(p)}
-                  className={`relative flex min-h-[104px] flex-col justify-between gap-2 rounded-2xl border bg-white p-3 text-left transition-transform active:scale-95 ${
-                    out ? 'cursor-not-allowed border-hair opacity-60' : 'border-hair hover:border-brand'
-                  }`}
-                >
-                  <div className="line-clamp-2 text-[0.9375rem] leading-snug font-semibold text-ink">{p.name}</div>
-                  <div className="flex items-end justify-between gap-2">
-                    <span className="tabular-nums text-[1.0625rem] font-bold text-ink">{formatCRC(p.sale_price)}</span>
-                    <span className={`tabular-nums text-[0.75rem] font-semibold ${out ? 'text-danger' : p.stock_qty <= p.min_qty ? 'text-warn' : 'text-ink-2'}`}>
-                      {out ? 'Agotado' : p.stock_qty <= p.min_qty ? `inv. ${p.stock_qty} · bajo` : `inv. ${p.stock_qty}`}
-                    </span>
-                  </div>
-                  {inCart[p.id] > 0 && (
-                    <span className="tabular-nums absolute -top-1.5 -right-1.5 flex h-[26px] min-w-[26px] items-center justify-center rounded-full border-2 border-paper bg-brand px-1.5 text-[0.8125rem] font-bold text-white">
-                      {inCart[p.id]}
-                    </span>
-                  )}
-                </button>
-              )
-            })}
+      <div className="flex-1 space-y-4 overflow-y-auto p-4">
+        {/* Efectivo en caja */}
+        <section className="rounded-[22px] bg-brand p-4 text-white">
+          <div className="text-[0.8125rem] font-semibold opacity-85">Efectivo en caja</div>
+          <div className="font-display-m tabular-nums text-[2.25rem] leading-tight font-bold">{formatCRC(expected)}</div>
+          <div className="mt-3 grid grid-cols-3 gap-2 text-[0.8125rem]">
+            <Stat label="Apertura" value={formatCRC(shift?.opening_cash ?? 0)} />
+            <Stat label="Entradas" value={`+${formatCRC(cashSales + ins)}`} />
+            <Stat label="Salidas" value={`−${formatCRC(outs)}`} />
           </div>
-        )}
-      </div>
+          <div className="mt-3 border-t border-white/20 pt-2 text-[0.8125rem] opacity-90">
+            Ventas de hoy: <span className="tabular-nums font-semibold">{formatCRC(salesTotal)}</span> en {sales.length} tiquete{sales.length === 1 ? '' : 's'}
+          </div>
+        </section>
 
-      {/* Cart bar */}
-      {count > 0 && (
-        <div className="shrink-0 rounded-t-[22px] border-t border-hair bg-white px-4 pt-3 pb-[max(env(safe-area-inset-bottom),1rem)] shadow-[0_-10px_30px_-18px_rgba(27,31,28,0.35)]">
+        {/* Acciones */}
+        <div className="grid grid-cols-2 gap-2.5">
           <button
-            onClick={() => setSheet(true)}
-            className="flex h-14 w-full items-center gap-2.5 rounded-2xl bg-brand px-4 text-white"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            className="flex min-h-[88px] flex-col items-start justify-between rounded-[18px] bg-ink p-3.5 text-left text-white disabled:opacity-60"
           >
-            <span className="tabular-nums flex h-[30px] min-w-[30px] items-center justify-center rounded-full bg-marigold px-2 text-[0.875rem] font-bold text-ink">
-              {count}
-            </span>
-            <span className="flex-1 text-left text-[1.0625rem] font-bold">Cobrar</span>
-            <span className="font-display-m tabular-nums text-[1.375rem] font-bold">{formatCRC(total)}</span>
+            {uploading ? <Loader2 size={22} className="animate-spin text-marigold" /> : <Camera size={22} className="text-marigold" aria-hidden="true" />}
+            <span className="text-[0.9375rem] font-bold">{uploading ? 'Subiendo foto…' : 'Registrar tiquete'}</span>
           </button>
-          <p className="tabular-nums mt-1.5 text-center text-[0.8125rem] text-ink-2">
-            Subtotal {formatCRC(subtotal)} + IVA {formatCRC(tax)} · tocá para ver el carrito
-          </p>
+          <button onClick={() => setCashSheet(true)} className="flex min-h-[88px] flex-col items-start justify-between rounded-[18px] border border-hair bg-white p-3.5 text-left">
+            <ArrowUpRight size={22} className="text-danger" aria-hidden="true" />
+            <span className="text-[0.9375rem] font-bold text-ink">Salida o entrada de efectivo</span>
+          </button>
         </div>
-      )}
+        <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => onPhoto(e.target.files)} className="hidden" />
+        {uploadErr && <p className="text-[0.875rem] text-danger">{uploadErr}</p>}
 
-      {/* Cart sheet */}
-      {sheet && (
-        <div className="absolute inset-0 z-10 flex flex-col justify-end bg-black/30" onClick={() => setSheet(false)}>
-          <div
-            className="max-h-[85%] overflow-y-auto rounded-t-[22px] bg-white p-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-[1.125rem] font-bold text-ink">Carrito</h2>
-              <button onClick={() => setSheet(false)} aria-label="Cerrar" className="-mr-2 flex h-11 w-11 items-center justify-center rounded-full text-ink-2 hover:bg-paper-2">
-                <X size={22} />
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              {cart.map((l) => (
-                <div key={l.product.id} className="flex items-center gap-2 rounded-2xl bg-paper p-2.5">
-                  <div className="flex-1">
-                    <div className="text-[0.875rem] font-semibold text-ink">{l.product.name}</div>
-                    <div className="tabular-nums text-[0.8125rem] text-ink-2">{formatCRC(l.product.sale_price)}</div>
-                  </div>
-                  <button onClick={() => setQty(l.product.id, -1)} aria-label={`Quitar uno de ${l.product.name}`} className="flex h-11 w-11 items-center justify-center rounded-full border border-hair bg-white text-ink">
-                    <Minus size={18} aria-hidden="true" />
+        {/* Tiquetes sin registrar */}
+        {pending.length > 0 && (
+          <div>
+            <Eyebrow className="mb-2">Tiquetes por registrar</Eyebrow>
+            <Card className="overflow-hidden">
+              {pending.map((c) => (
+                <div key={c.id} className="flex items-center gap-2 border-b border-paper-2 px-3.5 py-2.5 last:border-b-0">
+                  <button onClick={() => setTicketId(c.id)} className="flex min-h-11 flex-1 items-center gap-2.5 text-left">
+                    <Receipt size={18} className="text-warn" aria-hidden="true" />
+                    <span className="flex-1">
+                      <span className="block text-[0.9375rem] font-semibold text-ink">Foto de las {time(c.created_at)}</span>
+                      <span className="block text-[0.8125rem] text-ink-2">
+                        {c.ai_status === 'procesando' ? 'Leyendo…' : c.ai_status === 'error' ? 'No se pudo leer' : 'Falta enrutar productos'}
+                      </span>
+                    </span>
+                    <ChevronRight size={18} className="text-ink-3" aria-hidden="true" />
                   </button>
-                  <span className="w-6 text-center tabular-nums text-[0.9375rem] font-semibold">{l.qty}</span>
-                  <button onClick={() => setQty(l.product.id, 1)} aria-label={`Agregar uno de ${l.product.name}`} className="flex h-11 w-11 items-center justify-center rounded-full border border-hair bg-white text-ink">
-                    <Plus size={18} aria-hidden="true" />
-                  </button>
-                  <button onClick={() => removeLine(l.product.id)} aria-label={`Eliminar ${l.product.name}`} className="flex h-11 w-9 items-center justify-center text-danger">
-                    <Trash2 size={16} />
+                  <button
+                    onClick={() => archive.mutate({ id: c.id, status: 'archivado' })}
+                    aria-label="Descartar foto"
+                    className="flex h-11 w-11 items-center justify-center rounded-full text-ink-3 hover:bg-paper-2"
+                  >
+                    <X size={18} />
                   </button>
                 </div>
               ))}
-            </div>
-
-            <div className="mt-4 space-y-1 border-t border-hair pt-3 text-[0.9375rem]">
-              <Row label="Subtotal" value={formatCRC(subtotal)} />
-              <Row label="IVA (13%)" value={formatCRC(tax)} />
-              <div className="flex justify-between pt-1 text-[1.125rem] font-bold text-ink">
-                <span>Total</span>
-                <span className="tabular-nums text-brand">{formatCRC(total)}</span>
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <div className="mb-2 text-[0.875rem] font-semibold text-ink-2">Método de pago</div>
-              <div className="grid grid-cols-4 gap-2">
-                {METHODS.map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={() => setMethod(m.id)}
-                    aria-pressed={method === m.id}
-                    className={`flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-2xl border py-2 text-[0.8125rem] font-semibold ${
-                      method === m.id ? 'border-2 border-brand bg-brand-tint text-brand' : 'border-hair-strong text-ink'
-                    }`}
-                  >
-                    <m.icon size={20} aria-hidden="true" />
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {method === 'efectivo' && (
-              <div className="mt-3 flex items-center gap-3">
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={received}
-                  onChange={(e) => setReceived(e.target.value)}
-                  placeholder="Efectivo recibido"
-                  className="flex-1 h-12 rounded-[14px] border border-hair-strong bg-white px-3.5 text-[0.9375rem] outline-none focus:border-brand"
-                />
-                <div className="text-right">
-                  <div className="text-[0.8125rem] text-ink-3">Cambio</div>
-                  <div className="tabular-nums text-base font-bold text-ink">{formatCRC(change)}</div>
-                </div>
-              </div>
-            )}
-
-            <button
-              onClick={cobrar}
-              disabled={checkout.isPending}
-              className="mt-4 w-full rounded-2xl bg-brand py-3.5 text-base font-semibold text-white shadow-sm transition-colors hover:bg-brand-dark disabled:opacity-60"
-            >
-              {checkout.isPending ? 'Procesando…' : `Cobrar ${formatCRC(total)}`}
-            </button>
-            {checkout.isError && (
-              <p className="mt-2 text-center text-[0.875rem] text-danger">
-                Error al cobrar: {(checkout.error as Error).message}
-              </p>
-            )}
+            </Card>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Turno sheet */}
+        {/* Movimientos */}
+        <div>
+          <Eyebrow className="mb-2">Movimientos de hoy</Eyebrow>
+          <Card className="overflow-hidden">
+            {feed.length === 0 && <p className="px-4 py-8 text-center text-[0.9375rem] text-ink-2">Todavía no hay movimientos. Tomale foto al primer tiquete.</p>}
+            {feed.map((r) => (
+              <div key={r.id} className="flex items-center gap-3 border-b border-paper-2 px-3.5 py-3 last:border-b-0">
+                <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${r.out ? 'bg-danger-tint text-danger' : 'bg-brand-tint text-brand'}`}>
+                  <r.icon size={18} aria-hidden="true" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[0.9375rem] font-semibold text-ink">{r.title}</span>
+                  <span className="block truncate text-[0.8125rem] text-ink-2">
+                    {time(r.at)} · {r.sub}
+                  </span>
+                </span>
+                <span className={`tabular-nums flex items-center gap-0.5 text-[0.9375rem] font-bold ${r.out ? 'text-danger' : 'text-brand'}`}>
+                  {r.out ? <ArrowUpRight size={14} aria-hidden="true" /> : <ArrowDownLeft size={14} aria-hidden="true" />}
+                  {r.out ? '−' : '+'}
+                  {formatCRC(r.amount)}
+                </span>
+              </div>
+            ))}
+          </Card>
+        </div>
+      </div>
+
+      {ticketId && <TicketSheet captureId={ticketId} shiftId={shift?.id ?? null} onClose={() => setTicketId(null)} />}
+      {cashSheet && <CashSheet shiftId={shift?.id ?? null} onClose={() => setCashSheet(false)} />}
       {turnoSheet && (
-        <div className="absolute inset-0 z-30 flex flex-col justify-end bg-black/30" onClick={() => setTurnoSheet(false)}>
-          <div className="rounded-t-[22px] bg-white p-4" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-[1.125rem] font-bold text-ink">{shift ? 'Cierre de turno' : 'Abrir turno'}</h2>
-              <button onClick={() => setTurnoSheet(false)} aria-label="Cerrar" className="-mr-2 flex h-11 w-11 items-center justify-center rounded-full text-ink-2 hover:bg-paper-2">
-                <X size={22} />
-              </button>
-            </div>
-
-            {shift ? (
-              <>
-                <div className="mb-1 flex justify-between text-[0.875rem] text-ink-2">
-                  <span>Apertura</span>
-                  <span className="tabular-nums">{formatCRC(shift.opening_cash)}</span>
-                </div>
-                <div className="mb-1 flex justify-between text-[0.875rem] text-ink-2">
-                  <span>Ventas en efectivo</span>
-                  <span className="tabular-nums">{formatCRC(efectivoHoy)}</span>
-                </div>
-                <div className="mb-3 flex justify-between border-t border-hair pt-2 text-[0.9375rem] font-semibold text-ink">
-                  <span>Efectivo esperado</span>
-                  <span className="tabular-nums text-brand">{formatCRC(expectedCash)}</span>
-                </div>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={closingCash}
-                  onChange={(e) => setClosingCash(e.target.value)}
-                  placeholder="Efectivo contado"
-                  className="mb-2 w-full h-12 rounded-[14px] border border-hair-strong bg-white px-3.5 text-[0.9375rem] outline-none focus:border-brand"
-                />
-                {closingCash && (
-                  <p className={`mb-2 text-[0.875rem] font-semibold ${cashDiff === 0 ? 'text-brand' : cashDiff < 0 ? 'text-danger' : 'text-warn'}`}>
-                    {cashDiff === 0 ? 'Cuadra exacto' : cashDiff < 0 ? `Faltante ${formatCRC(Math.abs(cashDiff))}` : `Sobrante ${formatCRC(cashDiff)}`}
-                  </p>
-                )}
-                <button
-                  onClick={async () => {
-                    await closeShift.mutateAsync({ shiftId: shift.id, closingCash: Number(closingCash) || 0 })
-                    setClosingCash('')
-                    setTurnoSheet(false)
-                  }}
-                  disabled={closeShift.isPending}
-                  className="w-full rounded-2xl bg-ink py-3 text-[0.9375rem] font-semibold text-white disabled:opacity-60"
-                >
-                  {closeShift.isPending ? 'Cerrando…' : 'Cerrar turno'}
-                </button>
-              </>
-            ) : (
-              <>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={openingCash}
-                  onChange={(e) => setOpeningCash(e.target.value)}
-                  placeholder="Monto inicial en caja"
-                  className="mb-3 w-full h-12 rounded-[14px] border border-hair-strong bg-white px-3.5 text-[0.9375rem] outline-none focus:border-brand"
-                />
-                <button
-                  onClick={async () => {
-                    await openShift.mutateAsync({ openingCash: Number(openingCash) || 0 })
-                    setOpeningCash('')
-                    setTurnoSheet(false)
-                  }}
-                  disabled={openShift.isPending}
-                  className="w-full rounded-2xl bg-brand py-3 text-[0.9375rem] font-semibold text-white disabled:opacity-60"
-                >
-                  {openShift.isPending ? 'Abriendo…' : 'Abrir turno'}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Success */}
-      {doneSale && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white p-8 text-center">
-          <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-brand-tint text-brand">
-            <Check size={40} strokeWidth={2.5} />
-          </div>
-          <h2 className="text-[1.3rem] font-bold text-ink">Venta registrada</h2>
-          <p className="mt-1 text-[0.9375rem] text-ink-2">
-            {formatCRC(doneSale.total)} · inventario actualizado
-          </p>
-          <div className="mt-6 flex w-full max-w-xs flex-col gap-2">
-            <button
-              onClick={() => {
-                setDoneSale(null)
-                setSheet(false)
-              }}
-              className="w-full rounded-2xl bg-brand py-3 text-[0.9375rem] font-semibold text-white"
-            >
-              Nueva venta
-            </button>
-            <button onClick={() => navigate('/app')} className="w-full rounded-2xl border border-hair-strong py-3 text-[0.9375rem] font-semibold text-ink-2">
-              Volver al inicio
-            </button>
-          </div>
-        </div>
+        <TurnoSheet
+          expected={expected}
+          breakdown={{ opening: shift?.opening_cash ?? 0, cashSales, ins, outs }}
+          shiftId={shift?.id ?? null}
+          onClose={() => setTurnoSheet(false)}
+        />
       )}
     </div>
   )
 }
 
-function Pill({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <button
-      onClick={onClick}
-      aria-pressed={active}
-      className={`h-9 shrink-0 rounded-full px-3.5 text-[0.875rem] font-semibold transition-colors ${
-        active ? 'bg-ink text-white' : 'border border-hair-strong bg-white text-ink'
-      }`}
-    >
-      {children}
-    </button>
+    <div>
+      <div className="opacity-75">{label}</div>
+      <div className="tabular-nums truncate font-semibold">{value}</div>
+    </div>
   )
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="flex justify-between text-ink-2">
+    <div className="absolute inset-0 z-30 flex flex-col justify-end bg-black/30" onClick={onClose}>
+      <div className="max-h-[90%] overflow-y-auto rounded-t-[22px] bg-white p-4 pb-[max(env(safe-area-inset-bottom),1rem)]" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-[1.125rem] font-bold text-ink">{title}</h2>
+          <button onClick={onClose} aria-label="Cerrar" className="-mr-2 flex h-11 w-11 items-center justify-center rounded-full text-ink-2 hover:bg-paper-2">
+            <X size={22} />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+const field = 'w-full h-12 rounded-[14px] border border-hair-strong bg-white px-3.5 text-[0.9375rem] outline-none focus:border-brand'
+
+function CashSheet({ shiftId, onClose }: { shiftId: string | null; onClose: () => void }) {
+  const add = useAddCashMovement()
+  const { data: suppliers = [] } = useSuppliers()
+  const [kind, setKind] = useState<CashKind>('gasto')
+  const [amount, setAmount] = useState('')
+  const [note, setNote] = useState('')
+  const [supplierId, setSupplierId] = useState('')
+  const n = Number(amount) || 0
+
+  const save = async () => {
+    const supplier = suppliers.find((s) => s.id === supplierId)
+    await add.mutateAsync({
+      kind,
+      amount: n,
+      note: kind === 'pago_proveedor' && supplier ? [supplier.name, note.trim()].filter(Boolean).join(' · ') : note,
+      supplierId: kind === 'pago_proveedor' ? supplierId || null : null,
+      shiftId,
+    })
+    onClose()
+  }
+
+  return (
+    <Sheet title="Movimiento de efectivo" onClose={onClose}>
+      <div className="grid grid-cols-2 gap-2">
+        {(Object.keys(KIND) as CashKind[]).map((k) => {
+          const K = KIND[k]
+          return (
+            <button
+              key={k}
+              onClick={() => setKind(k)}
+              aria-pressed={kind === k}
+              className={`flex min-h-[52px] items-center gap-2 rounded-2xl border px-3 text-left text-[0.875rem] font-semibold ${
+                kind === k ? 'border-2 border-brand bg-brand-tint text-brand' : 'border-hair-strong text-ink'
+              }`}
+            >
+              <K.icon size={18} aria-hidden="true" className={kind === k ? '' : K.out ? 'text-danger' : 'text-brand'} />
+              {K.label}
+            </button>
+          )
+        })}
+      </div>
+
+      <label className="mt-3 block text-[0.8125rem] font-semibold text-ink-2">
+        Monto (₡)
+        <input type="number" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} className={`mt-1 ${field} tabular-nums`} />
+      </label>
+
+      {kind === 'pago_proveedor' && (
+        <label className="mt-3 block text-[0.8125rem] font-semibold text-ink-2">
+          Proveedor
+          <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} className={`mt-1 ${field}`}>
+            <option value="">— Elegí el proveedor —</option>
+            {suppliers.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      <label className="mt-3 block text-[0.8125rem] font-semibold text-ink-2">
+        Detalle
+        <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} placeholder={KIND[kind].hint} className={`mt-1 ${field}`} />
+      </label>
+
+      <button
+        onClick={save}
+        disabled={n <= 0 || add.isPending || (kind === 'pago_proveedor' && !supplierId)}
+        className={`mt-4 h-14 w-full rounded-2xl text-base font-bold text-white disabled:opacity-50 ${KIND[kind].out ? 'bg-ink' : 'bg-brand'}`}
+      >
+        {add.isPending ? 'Guardando…' : `${KIND[kind].out ? 'Registrar salida' : 'Registrar entrada'} ${n > 0 ? formatCRC(n) : ''}`}
+      </button>
+      {add.isError && <p className="mt-2 text-center text-[0.875rem] text-danger">{(add.error as Error).message}</p>}
+    </Sheet>
+  )
+}
+
+function TurnoSheet({
+  expected,
+  breakdown,
+  shiftId,
+  onClose,
+}: {
+  expected: number
+  breakdown: { opening: number; cashSales: number; ins: number; outs: number }
+  shiftId: string | null
+  onClose: () => void
+}) {
+  const openShift = useOpenShiftMutation()
+  const closeShift = useCloseShiftMutation()
+  const [amount, setAmount] = useState('')
+  const diff = amount ? Number(amount) - expected : 0
+
+  if (!shiftId) {
+    return (
+      <Sheet title="Abrir turno" onClose={onClose}>
+        <label className="block text-[0.8125rem] font-semibold text-ink-2">
+          Efectivo con el que abre la caja (₡)
+          <input type="number" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} className={`mt-1 mb-3 ${field} tabular-nums`} />
+        </label>
+        <button
+          onClick={async () => {
+            await openShift.mutateAsync({ openingCash: Number(amount) || 0 })
+            onClose()
+          }}
+          disabled={openShift.isPending}
+          className="h-14 w-full rounded-2xl bg-brand text-base font-bold text-white disabled:opacity-60"
+        >
+          {openShift.isPending ? 'Abriendo…' : 'Abrir turno'}
+        </button>
+      </Sheet>
+    )
+  }
+
+  return (
+    <Sheet title="Cierre de turno" onClose={onClose}>
+      <div className="space-y-1 text-[0.875rem] text-ink-2">
+        <Line label="Apertura" value={formatCRC(breakdown.opening)} />
+        <Line label="Tiquetes en efectivo" value={`+${formatCRC(breakdown.cashSales)}`} />
+        <Line label="Otras entradas" value={`+${formatCRC(breakdown.ins)}`} />
+        <Line label="Salidas" value={`−${formatCRC(breakdown.outs)}`} />
+      </div>
+      <div className="mt-2 mb-3 flex justify-between border-t border-hair pt-2 text-[0.9375rem] font-semibold text-ink">
+        <span>Efectivo esperado</span>
+        <span className="tabular-nums text-brand">{formatCRC(expected)}</span>
+      </div>
+      <input
+        type="number"
+        inputMode="numeric"
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+        placeholder="Efectivo contado"
+        aria-label="Efectivo contado"
+        className={`mb-2 ${field} tabular-nums`}
+      />
+      {amount && (
+        <p className={`mb-2 text-[0.875rem] font-semibold ${diff === 0 ? 'text-brand' : diff < 0 ? 'text-danger' : 'text-warn'}`}>
+          {diff === 0 ? 'Cuadra exacto' : diff < 0 ? `Faltante ${formatCRC(Math.abs(diff))}` : `Sobrante ${formatCRC(diff)}`}
+        </p>
+      )}
+      <button
+        onClick={async () => {
+          await closeShift.mutateAsync({ shiftId, closingCash: Number(amount) || 0 })
+          onClose()
+        }}
+        disabled={closeShift.isPending || !amount}
+        className="h-14 w-full rounded-2xl bg-ink text-base font-bold text-white disabled:opacity-60"
+      >
+        {closeShift.isPending ? 'Cerrando…' : 'Cerrar turno'}
+      </button>
+    </Sheet>
+  )
+}
+
+function Line({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between">
       <span>{label}</span>
       <span className="tabular-nums">{value}</span>
     </div>

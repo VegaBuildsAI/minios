@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { BarChart3, Bell, ChevronRight, LayoutDashboard, LogOut, Mic, NotebookPen, Package, Settings, ShoppingCart, Truck, type LucideIcon } from 'lucide-react'
+import { BarChart3, Bell, ChevronRight, LayoutDashboard, LogOut, Mic, NotebookPen, Package, Settings, Truck, Wallet, type LucideIcon } from 'lucide-react'
 import { Card, ScreenHeader } from '../components'
 import { useAuth } from '@/modules/auth/context'
 
@@ -11,7 +11,7 @@ interface Tile {
 }
 
 const TILES: Tile[] = [
-  { icon: ShoppingCart, name: 'Caja', to: '/app/caja' },
+  { icon: Wallet, name: 'Caja', to: '/app/caja' },
   { icon: Package, name: 'Inventario', to: '/app/inventario' },
   { icon: Mic, name: 'Asistente IA', to: '/app/assistant' },
   { icon: Bell, name: 'Alertas', to: '/app/alerta' },

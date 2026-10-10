@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase'
-import { IVA_RATE, type CaptureCategory, type CaptureStatus, type CaptureType, type CartLine, type Category, type MovementReason, type PaymentMethod, type Product, type PurchaseItem, type PurchaseOrder, type Sale, type Shift, type StockMovement, type Supplier, type Capture, type Proposal } from './types'
+import { type CaptureCategory, type CaptureStatus, type CaptureType, type CashKind, type CashMovement, type Category, type MovementReason, type PaymentMethod, type Product, type PurchaseItem, type PurchaseOrder, type Sale, type Shift, type StockMovement, type Supplier, type Capture, type Proposal } from './types'
 
 function startOfToday(): string {
   const d = new Date()
@@ -130,39 +130,78 @@ async function currentUserId(): Promise<string | null> {
   return data.user?.id ?? null
 }
 
-export interface CheckoutInput {
-  cart: CartLine[]
-  paymentMethod: PaymentMethod
-  shiftId: string | null
+/** Entradas y salidas de efectivo de hoy (las que no son ventas). */
+export function useTodayCashMovements() {
+  return useQuery({
+    queryKey: ['cash_movements', 'today'],
+    queryFn: async (): Promise<CashMovement[]> => {
+      const { data, error } = await supabase
+        .from('cash_movements')
+        .select('*')
+        .gte('created_at', startOfToday())
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return data as CashMovement[]
+    },
+  })
 }
 
-export function useCheckout() {
+export function useAddCashMovement() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async ({ cart, paymentMethod, shiftId }: CheckoutInput): Promise<Sale> => {
-      const subtotal = cart.reduce((s, l) => s + l.product.sale_price * l.qty, 0)
-      const tax = subtotal * IVA_RATE
-      const total = subtotal + tax
-      const staff_id = await currentUserId()
+    mutationFn: async (m: { kind: CashKind; amount: number; note: string; supplierId: string | null; shiftId: string | null }) => {
+      const created_by = await currentUserId()
+      const { error } = await supabase.from('cash_movements').insert({
+        kind: m.kind,
+        amount: m.amount,
+        note: m.note.trim() || null,
+        supplier_id: m.supplierId,
+        shift_id: m.shiftId,
+        created_by,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cash_movements'] }),
+  })
+}
 
-      const { data: sale, error: saleErr } = await supabase
-        .from('sales')
-        .insert({ staff_id, shift_id: shiftId, payment_method: paymentMethod, subtotal, tax, total, change_given: 0 })
-        .select()
-        .single()
-      if (saleErr) throw saleErr
+export interface TicketLine {
+  product_id: string
+  qty: number
+  price: number
+}
 
-      const items = cart.map((l) => ({
-        sale_id: (sale as Sale).id,
-        product_id: l.product.id,
-        qty: l.qty,
-        unit_price: l.product.sale_price,
-      }))
-      const { error: itemsErr } = await supabase.from('sale_items').insert(items)
-      if (itemsErr) throw itemsErr
-      return sale as Sale
+/**
+ * Registra un tiquete de la registradora como venta: todo o nada en la base
+ * (`register_ticket`). Cada línea ya viene enrutada a un producto; el trigger de
+ * sale_items baja el inventario.
+ */
+export function useRegisterTicket() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (t: {
+      captureId: string | null
+      shiftId: string | null
+      payment: PaymentMethod
+      number: string
+      total: number
+      tax: number
+      lines: TicketLine[]
+    }) => {
+      const { data, error } = await supabase.rpc('register_ticket', {
+        p_capture: t.captureId,
+        p_shift: t.shiftId,
+        p_payment: t.payment,
+        p_number: t.number,
+        p_total: t.total,
+        p_tax: t.tax,
+        p_lines: t.lines,
+      })
+      if (error) throw error
+      return data as string
     },
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['captures'] })
       qc.invalidateQueries({ queryKey: ['products'] })
       qc.invalidateQueries({ queryKey: ['stats'] })
       qc.invalidateQueries({ queryKey: ['sales'] })
@@ -185,6 +224,76 @@ export function useAdjustStock() {
       qc.invalidateQueries({ queryKey: ['products'] })
       qc.invalidateQueries({ queryKey: ['stats'] })
       qc.invalidateQueries({ queryKey: ['movements'] })
+    },
+  })
+}
+
+export interface NewProductInput {
+  name: string
+  sku: string
+  categoryId: string | null
+  supplierId: string | null
+  unit: string
+  costPrice: number
+  salePrice: number
+  minQty: number
+  initialQty: number
+}
+
+/** Crea un producto (owner+). El stock inicial entra como movimiento "entrada" para que quede en el historial. */
+export function useCreateProduct() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: NewProductInput) => {
+      const { data, error } = await supabase
+        .from('products')
+        .insert({
+          name: p.name.trim(),
+          sku: p.sku.trim() || null,
+          category_id: p.categoryId,
+          supplier_id: p.supplierId,
+          unit: p.unit,
+          cost_price: p.costPrice,
+          sale_price: p.salePrice,
+          min_qty: p.minQty,
+          stock_qty: 0,
+        })
+        .select('id')
+        .single()
+      if (error) throw error.code === '23505' ? new Error('Ya existe un producto con ese código.') : error
+      if (p.initialQty > 0) {
+        const { error: mErr } = await supabase
+          .from('stock_movements')
+          .insert({ product_id: data.id, delta: p.initialQty, reason: 'entrada', created_by: await currentUserId() })
+        if (mErr) throw mErr
+      }
+      return data.id as string
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['products'] })
+      qc.invalidateQueries({ queryKey: ['stats'] })
+    },
+  })
+}
+
+/**
+ * Entrada de mercadería sin factura: varios productos con cantidad y costo. Usa la misma
+ * función que aplica facturas (`apply_invoice`, sin foto): crea la compra recibida y sube
+ * el inventario en una sola transacción.
+ */
+export function useManualEntry() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ supplierId, lines }: { supplierId: string | null; lines: { product_id: string; qty: number; cost: number }[] }) => {
+      const { data, error } = await supabase.rpc('apply_invoice', { p_capture: null, p_supplier: supplierId, p_lines: lines })
+      if (error) throw error
+      return data as string
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['products'] })
+      qc.invalidateQueries({ queryKey: ['stats'] })
+      qc.invalidateQueries({ queryKey: ['movements'] })
+      qc.invalidateQueries({ queryKey: ['purchase_orders'] })
     },
   })
 }

@@ -74,7 +74,7 @@ export function Ventas() {
           </div>
           {top.length === 0 ? (
             <Card className="p-6 text-center text-[0.875rem] text-ink-3">
-              Todavía no hay ventas en el período. Registrá ventas en la Caja para ver la rentabilidad.
+              Todavía no hay ventas en el período. Registrá los tiquetes en la Caja para ver la rentabilidad.
             </Card>
           ) : (
             <div className="space-y-2.5">

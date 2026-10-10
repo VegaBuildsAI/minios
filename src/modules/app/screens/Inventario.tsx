@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
-import { Search, SlidersHorizontal, X } from 'lucide-react'
+import { PackagePlus, Plus, Search, SlidersHorizontal, X } from 'lucide-react'
 import { Card, ProgressBar, ScreenHeader, Segmented } from '../components'
 import { useAdjustStock, useProducts, useStockMovements } from '@/lib/data'
 import { formatCRC, type MovementReason, type Product } from '@/lib/types'
+import { useAuth } from '@/modules/auth/context'
+import { ManualEntrySheet, NewProductSheet } from '../widgets/InventarioSheets'
 
 function statusOf(st: number, min: number): { label: string; tone: 'teal' | 'amber' | 'rose' } {
   if (st <= 0) return { label: 'Agotado', tone: 'rose' }
@@ -35,6 +37,9 @@ export function Inventario() {
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<Filter>('todos')
   const [sel, setSel] = useState<Product | null>(null)
+  const [sheet, setSheet] = useState<'nuevo' | 'entrada' | null>(null)
+  const { profile } = useAuth()
+  const canEdit = profile?.role === 'owner' || profile?.role === 'superadmin'
 
   const critical = products.filter((p) => p.stock_qty <= p.min_qty).length
   const filtered = useMemo(
@@ -53,6 +58,17 @@ export function Inventario() {
         title="Inventario"
         subtitle={isLoading ? 'Cargando…' : `${products.length} productos · ${critical} requieren atención`}
       />
+
+      {canEdit && (
+        <div className="mb-3 grid grid-cols-2 gap-2.5">
+          <button onClick={() => setSheet('entrada')} className="flex h-12 items-center justify-center gap-2 rounded-[14px] bg-brand text-[0.9375rem] font-semibold text-white">
+            <PackagePlus size={18} aria-hidden="true" /> Entrada manual
+          </button>
+          <button onClick={() => setSheet('nuevo')} className="flex h-12 items-center justify-center gap-2 rounded-[14px] border border-hair-strong bg-white text-[0.9375rem] font-semibold text-ink">
+            <Plus size={18} aria-hidden="true" /> Nuevo producto
+          </button>
+        </div>
+      )}
 
       <label className="mb-3 flex h-12 items-center gap-2 rounded-[14px] border border-hair bg-white px-3.5">
         <Search size={20} className="text-ink-2" aria-hidden="true" />
@@ -107,6 +123,8 @@ export function Inventario() {
       </Card>
 
       {sel && <AdjustSheet product={sel} onClose={() => setSel(null)} />}
+      {sheet === 'nuevo' && <NewProductSheet onClose={() => setSheet(null)} />}
+      {sheet === 'entrada' && <ManualEntrySheet onClose={() => setSheet(null)} />}
     </div>
   )
 }
