@@ -1,4 +1,6 @@
-import { useAiSpendToday, useAiUsageSummary, useBusinessSettings, useCaptureStats } from '@/lib/data'
+import { Loader2, RefreshCw } from 'lucide-react'
+import { useAiSpendToday, useAiUsageSummary, useBusinessSettings, useCaptureStats, useMiniPlaybook, useRegenerateMini } from '@/lib/data'
+import { fmtTime } from '@/lib/time'
 import type { Capture } from '@/lib/types'
 import { ModuleCard } from './ui'
 import { whenOf } from './format'
@@ -20,6 +22,18 @@ export function BitacoraCard() {
   const budget = settings?.ai_daily_budget_usd ?? 2
   const pct = Math.min(100, (spend / Math.max(0.01, budget)) * 100)
   const s = stats?.byStatus ?? { borrador: 0, procesado: 0, archivado: 0 }
+  const { data: plan } = useMiniPlaybook()
+  const regen = useRegenerateMini()
+  const planState =
+    !plan
+      ? 'Sin plan todavía (se genera a las 9:00)'
+      : plan.status === 'listo'
+        ? `Listo a las ${fmtTime(plan.generated_at)} · ${plan.tokens} tokens · US$${Number(plan.cost_usd).toFixed(4)}`
+        : plan.status === 'enviado'
+          ? 'Lote enviado a la IA; mientras tanto, redacción local'
+          : plan.status === 'sin_ia'
+            ? 'Sin IA hoy: redacción local'
+            : 'Error al generar; usa la redacción local'
 
   return (
     <ModuleCard label="Bitácora e IA" title={`${stats?.total ?? 0} entradas · 30 días`} to="/app/bitacora">
@@ -60,6 +74,21 @@ export function BitacoraCard() {
           </span>
         </div>
       </div>
+
+      <div className="flex items-center gap-2 rounded-xl bg-paper px-3 py-2.5">
+        <div className="min-w-0 flex-1">
+          <div className="text-[0.8125rem] font-semibold text-ink">Plan diario de Mini</div>
+          <div className="tabular-nums truncate text-[0.75rem] text-ink-2">{planState}</div>
+        </div>
+        <button
+          onClick={() => regen.mutate()}
+          disabled={regen.isPending}
+          className="flex h-11 shrink-0 items-center gap-1.5 rounded-xl border border-hair-strong bg-white px-3 text-[0.8125rem] font-semibold text-ink disabled:opacity-50"
+        >
+          {regen.isPending ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <RefreshCw size={15} aria-hidden="true" />} Regenerar
+        </button>
+      </div>
+      {regen.isError && <p className="text-[0.8125rem] text-danger">{(regen.error as Error).message}</p>}
 
       <div className="flex flex-col">
         {(stats?.recent ?? []).slice(0, 3).map((c) => (

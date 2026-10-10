@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { fetchBriefing, localDayKey, useBusinessSettings, useCaptureStats, useDashboardStats, useSuppliers, type Briefing } from './data'
+import { localDayKey, useCaptureStats, useDashboardStats, useMiniPlaybook, useOpenShift, useShiftCash, useSuppliers, type PlaybookSlot } from './data'
 import { useInsights } from './insights'
 import { usePendingTickets } from './tickets'
 import { formatCRC } from './types'
@@ -153,56 +152,27 @@ export function useCompanion(goal: number, slot: DaySlot) {
   return { messages, loading: isLoading || !stats }
 }
 
-const BRIEF_KEY = 'minios-briefing'
-const BRIEF_TTL = 45 * 60_000
-
-interface CachedBriefing {
-  fp: string
-  at: number
-  data: Briefing
-}
-
-function readBrief(fp: string): CachedBriefing | undefined {
-  try {
-    const c = JSON.parse(localStorage.getItem(BRIEF_KEY) ?? 'null') as CachedBriefing | null
-    return c && c.fp === fp && Date.now() - c.at < BRIEF_TTL ? c : undefined
-  } catch {
-    return undefined
-  }
-}
+const SLOT_KEY: Record<DaySlot, PlaybookSlot> = { buho: 'mad', medianoche: 'mad', temprano: 'tem', manana: 'man', mediodia: 'med', tarde: 'tar', noche: 'noc' }
 
 /**
- * Mensaje de «Mini» redactado por la IA con el estado real del negocio. Solo se vuelve a
- * pedir cuando algo cambia (huella: día, franja, ventas, críticos, pendientes) o pasados
- * 45 min; mientras tanto se reutiliza el último (también entre aperturas de la app).
- * Si la IA está apagada o falla, el Inicio usa los avisos locales.
+ * Mensaje de «Mini» para esta franja, tomado del plan del día (mini-daily, 9:00 CR).
+ * Las cifras del momento se rellenan en vivo: {v} ventas, {t} tiquetes, {m} % de meta,
+ * {e} efectivo esperado. No llama a la IA.
  */
-export function useBriefing(goal: number, slot: DaySlot) {
+export function usePlaybookMessage(goal: number, slot: DaySlot) {
+  const { data: plan, isLoading } = useMiniPlaybook()
   const { data: stats } = useDashboardStats()
-  const { data: settings } = useBusinessSettings()
-  const { data: caps } = useCaptureStats()
-  const pending = usePendingTickets()
-  const fp = stats
-    ? [localDayKey(new Date()), slot, stats.salesTodayCount, stats.criticalCount, pending.length, caps?.byStatus.borrador ?? 0].join('|')
-    : ''
-  const cached = fp ? readBrief(fp) : undefined
-  const q = useQuery({
-    queryKey: ['briefing', fp],
-    enabled: !!fp && settings?.ai_enabled !== false,
-    staleTime: BRIEF_TTL,
-    retry: false,
-    refetchOnWindowFocus: false,
-    initialData: cached?.data,
-    initialDataUpdatedAt: cached?.at,
-    queryFn: async (): Promise<Briefing> => {
-      const b = await fetchBriefing(goal)
-      try {
-        localStorage.setItem(BRIEF_KEY, JSON.stringify({ fp, at: Date.now(), data: b }))
-      } catch {
-        /* sin caché persistente */
-      }
-      return b
-    },
-  })
-  return { briefing: q.data, loading: q.isFetching, error: q.isError, at: q.dataUpdatedAt, aiOff: settings?.ai_enabled === false }
+  const { data: shift } = useOpenShift()
+  const { data: cash } = useShiftCash(shift)
+  const pair = plan?.text?.s?.[SLOT_KEY[slot]]
+  const fill = (t: string) =>
+    t
+      .replaceAll('{v}', formatCRC(stats?.salesTodayTotal ?? 0))
+      .replaceAll('{t}', String(stats?.salesTodayCount ?? 0))
+      .replaceAll('{m}', `${goal ? Math.round(((stats?.salesTodayTotal ?? 0) / goal) * 100) : 0} %`)
+      .replaceAll('{e}', shift ? formatCRC(cash?.expected ?? shift.opening_cash) : 'sin turno abierto')
+  const msg: BotMessage | null = pair
+    ? { id: `plan:${plan?.day}:${SLOT_KEY[slot]}`, title: fill(pair[0]), text: fill(pair[1]), to: '/app/assistant', mood: slot === 'buho' || slot === 'medianoche' ? 'sleepy' : 'happy' }
+    : null
+  return { plan, message: msg, tips: (plan?.text?.c ?? []).map(fill), loading: isLoading }
 }

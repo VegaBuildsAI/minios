@@ -1,27 +1,15 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronRight, Loader2, MessageCircle, Send } from 'lucide-react'
-import { useBriefing, useCompanion, type BotMessage, type Mood } from '@/lib/companion'
-import { askAssistant, type BriefingScreen } from '@/lib/data'
+import { useCompanion, usePlaybookMessage, type BotMessage, type Mood } from '@/lib/companion'
+import { useCaptureStats, useDashboardStats, useOpenShift, useProducts, useShiftCash, useSuppliers } from '@/lib/data'
 import type { DaySlot } from '@/lib/greeting'
-import { fmtTime } from '@/lib/time'
-import type { Proposal } from '@/lib/types'
+import { answer, SUGGESTED, type MiniContext } from '@/lib/mini/intents'
+import { usePendingTickets } from '@/lib/tickets'
+import { crParts, fmtTime } from '@/lib/time'
 import { MiniBot } from './MiniBot'
-import { ProposalCard } from './ProposalCard'
 
 const IDLE_MS = 25_000
-const SCREEN: Record<BriefingScreen, string> = {
-  caja: '/app/caja',
-  inventario: '/app/inventario',
-  proveedores: '/app/proveedores',
-  bitacora: '/app/bitacora',
-  ventas: '/app/ventas',
-  reportes: '/app/reports',
-  asistente: '/app/assistant',
-  alerta: '/app/alerta',
-}
-const DEFAULT_ASK = ['¿Qué pido hoy?', '¿Cómo van las ventas?', '¿Qué se está agotando?']
-
 const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 /** Escribe `text` letra por letra (una vez por `key`); con «reducir movimiento», de una vez. */
@@ -54,20 +42,27 @@ function useTyped(text: string, key: string, delay: number, speed: number) {
 interface Turn {
   q: string
   a?: string
-  proposals?: Proposal[]
-  error?: boolean
+  mood?: Mood
+  to?: string
 }
 
 /**
- * «Mini», el agente del Inicio. Al entrar cuenta el estado real del abastecedor
- * (redactado por la IA con datos de Supabase; avisos locales si la IA no está), y se le
- * puede preguntar ahí mismo: responde con datos reales y propone acciones que el usuario
- * confirma. Su ánimo cambia con lo que dice y con lo que hace el usuario.
+ * «Mini», el agente del Inicio. Todo determinístico, sin llamar a la IA: cuenta el plan
+ * del día (lo redacta mini-daily una vez, 9:00 CR) con cifras en vivo, muestra los avisos
+ * locales y responde preguntas con el motor de intenciones (datos de la app + pronósticos
+ * del plan). Su ánimo cambia con lo que dice y con lo que hace el usuario.
  */
 export function Companion({ goal, slot, intro }: { goal: number; slot: DaySlot; intro: boolean }) {
   const { messages: local, loading: localLoading } = useCompanion(goal, slot)
-  const { briefing, loading: briefLoading, error: briefError, at, aiOff } = useBriefing(goal, slot)
-  // El índice se reinicia solo cuando cambia lo que redactó la IA (se muestra primero).
+  const { plan, message: planMsg, tips, loading: planLoading } = usePlaybookMessage(goal, slot)
+  const { data: stats } = useDashboardStats()
+  const { data: products = [] } = useProducts()
+  const { data: suppliers = [] } = useSuppliers()
+  const { data: shift } = useOpenShift()
+  const { data: shiftCash } = useShiftCash(shift)
+  const pending = usePendingTickets()
+  const { data: caps } = useCaptureStats()
+  // El índice se reinicia solo cuando cambia el plan del día (se muestra primero).
   const [cursor, setCursor] = useState({ k: '', i: 0 })
   const [turns, setTurns] = useState<Turn[]>([])
   const [mode, setMode] = useState<'brief' | 'chat'>('brief')
@@ -78,8 +73,9 @@ export function Companion({ goal, slot, intro }: { goal: number; slot: DaySlot; 
   const [seen, setSeen] = useState(0)
   const reactTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
-  // Avisos: primero lo que redactó la IA; después los avisos locales que no repiten lo mismo.
-  const ai: BotMessage | null = briefing ? { id: `ai:${briefing.titulo}`, title: briefing.titulo, text: briefing.mensaje, to: SCREEN[briefing.ir_a] ?? '/app/assistant', mood: briefing.mood } : null
+  // Avisos: primero el plan del día (con el ánimo del aviso más urgente); después los avisos locales.
+  const urgent = local.find((m) => m.mood === 'worried')
+  const ai: BotMessage | null = planMsg ? { ...planMsg, mood: urgent ? 'worried' : planMsg.mood } : null
   const notices: BotMessage[] = ai ? [ai, ...local.filter((m) => m.id !== 'ok' && m.id !== 'ask' && m.id !== 'summary')] : local
   const briefKey = ai?.id ?? 'local'
   const idx = cursor.k === briefKey ? Math.min(cursor.i, notices.length - 1) : 0
@@ -89,8 +85,8 @@ export function Companion({ goal, slot, intro }: { goal: number; slot: DaySlot; 
 
   const speech = chatting
     ? asking
-      ? { key: `q:${turns.length}`, title: 'Dejame revisar…', text: 'Estoy consultando tus datos.', to: '/app/assistant' }
-      : { key: `a:${turns.length}`, title: '', text: last.a ?? '', to: '/app/assistant' }
+      ? { key: `q:${turns.length}`, title: 'Dejame ver…', text: 'Reviso tus datos.', to: '/app/assistant' }
+      : { key: `a:${turns.length}`, title: '', text: last.a ?? '', to: last.to ?? '/app/assistant' }
     : { key: `${notice.id}:${seen}`, title: notice.title, text: notice.text, to: notice.to }
 
   const first = intro && seen === 0 && !chatting
@@ -129,12 +125,8 @@ export function Companion({ goal, slot, intro }: { goal: number; slot: DaySlot; 
   const baseMood: Mood = chatting
     ? asking
       ? 'thinking'
-      : last.error
-        ? 'worried'
-        : last.proposals?.length
-          ? 'excited'
-          : 'happy'
-    : localLoading || (briefLoading && !briefing)
+      : (last.mood ?? 'happy')
+    : localLoading || planLoading
       ? 'thinking'
       : notice.mood
   const mood: Mood = react ?? (asleep && !asking ? 'sleepy' : baseMood)
@@ -150,41 +142,50 @@ export function Companion({ goal, slot, intro }: { goal: number; slot: DaySlot; 
     setSeen((s) => s + 1)
   }
 
-  const ask = async (q: string) => {
+  // Respuesta local (sin red). La pausa corta es solo para que se sienta natural.
+  const ctx: MiniContext = {
+    goal,
+    dow: crParts().dow,
+    salesToday: stats?.salesTodayTotal ?? 0,
+    ticketsToday: stats?.salesTodayCount ?? 0,
+    critical: stats?.criticalCount ?? 0,
+    fiado: stats?.fiadoTotal ?? 0,
+    products,
+    suppliers,
+    shiftOpen: !!shift,
+    expectedCash: shift ? (shiftCash?.expected ?? Number(shift.opening_cash)) : null,
+    pendingTickets: pending.length,
+    bitacora: Math.max(0, (caps?.byStatus.borrador ?? 0) - pending.length),
+    facts: plan?.facts ?? null,
+    tips,
+  }
+  const ask = (q: string) => {
     const text = q.trim()
     if (!text || asking) return
     setInput('')
     setMode('chat')
-    const history = [...turns.flatMap((t) => (t.a ? [{ role: 'user' as const, content: t.q }, { role: 'assistant' as const, content: t.a }] : [])), { role: 'user' as const, content: text }]
     setTurns((ts) => [...ts, { q: text }])
     setAsking(true)
-    try {
-      const r = await askAssistant(history.slice(-8))
-      setTurns((ts) => ts.map((t, i) => (i === ts.length - 1 ? { ...t, a: r.reply, proposals: r.proposals } : t)))
-    } catch (e) {
-      setTurns((ts) => ts.map((t, i) => (i === ts.length - 1 ? { ...t, a: (e as Error).message || 'No pude consultar ahora. Probá de nuevo.', error: true } : t)))
-    } finally {
+    const r = answer(text, ctx)
+    setTimeout(() => {
+      setTurns((ts) => ts.map((t, i) => (i === ts.length - 1 ? { ...t, a: r.text, mood: r.mood, to: r.to } : t)))
       setAsking(false)
-    }
+    }, reducedMotion() ? 0 : 450)
   }
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
-    void ask(input)
+    ask(input)
   }
 
   const status = asking
-    ? 'consultando tus datos…'
-    : aiOff
-      ? 'IA apagada · avisos de hoy'
-      : briefLoading && !briefing
+    ? 'revisando tus datos…'
+    : plan
+      ? `plan de hoy · ${fmtTime(plan.generated_at)}`
+      : planLoading
         ? 'leyendo tu tienda…'
-        : briefError && !briefing
-          ? 'sin IA por ahora · avisos de hoy'
-          : briefing && at
-            ? `leyó tu tienda a las ${fmtTime(new Date(at))}`
-            : 'en línea'
-  const chips = (briefing?.sugerencias?.length ? briefing.sugerencias : DEFAULT_ASK).filter((c) => !turns.some((t) => t.q === c))
+        : 'avisos de hoy'
+  const chips = SUGGESTED.filter((c) => !turns.some((t) => t.q === c)).slice(0, 3)
   const enter = intro ? 'bubble-pop' : 'intro-soft'
 
   return (
@@ -209,7 +210,7 @@ export function Companion({ goal, slot, intro }: { goal: number; slot: DaySlot; 
           {/* Cola del globo hacia Mini */}
           <span aria-hidden="true" className="absolute top-6 -left-[7px] h-3.5 w-3.5 rotate-45 rounded-[3px] border-b border-l border-[#d6e7de] bg-white" />
           <div className="mb-1 flex items-center gap-1.5 text-[0.6875rem] font-bold tracking-[0.06em] text-brand uppercase">
-            {(asking || (briefLoading && !briefing)) && <Loader2 size={11} className="animate-spin" aria-hidden="true" />}
+            {(asking || planLoading) && <Loader2 size={11} className="animate-spin" aria-hidden="true" />}
             Mini · {status}
           </div>
           {chatting && <p className="mb-1 line-clamp-2 text-[0.8125rem] text-ink-3 italic">Vos: «{last.q}»</p>}
@@ -246,13 +247,12 @@ export function Companion({ goal, slot, intro }: { goal: number; slot: DaySlot; 
               onClick={() => flash('excited')}
               className="flex h-9 items-center gap-0.5 rounded-full bg-brand-tint pr-2 pl-3 text-[0.8125rem] font-bold text-brand"
             >
-              {chatting ? 'Abrir chat' : 'Ver'} <ChevronRight size={16} aria-hidden="true" />
+              Ver <ChevronRight size={16} aria-hidden="true" />
             </Link>
           </div>
         </div>
       </div>
 
-      {chatting && !asking && last.proposals?.map((p) => <ProposalCard key={p.id} p={p} />)}
 
       {chips.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5" aria-label="Preguntas sugeridas">
@@ -260,7 +260,7 @@ export function Companion({ goal, slot, intro }: { goal: number; slot: DaySlot; 
             <button
               key={c}
               type="button"
-              onClick={() => void ask(c)}
+              onClick={() => ask(c)}
               disabled={asking}
               className="h-9 rounded-full border border-[#cfe3da] bg-white px-3 text-[0.8125rem] font-semibold text-ink hover:border-brand disabled:opacity-50"
             >

@@ -1065,20 +1065,67 @@ export interface AssistantReply {
   tokens: number
 }
 
-export type BriefingScreen = 'caja' | 'inventario' | 'proveedores' | 'bitacora' | 'ventas' | 'reportes' | 'asistente' | 'alerta'
+export type PlaybookSlot = 'mad' | 'tem' | 'man' | 'med' | 'tar' | 'noc'
 
-/** Lo que «Mini» le dice al usuario al abrir el Inicio, redactado por la IA con datos reales. */
-export interface Briefing {
-  mood: 'happy' | 'excited' | 'worried' | 'thinking' | 'sleepy'
-  titulo: string
-  mensaje: string
-  ir_a: BriefingScreen
-  sugerencias: string[]
+/** Hechos del día que calcula mini-daily en el servidor (determinístico + ML). Solo lo que usa la app. */
+export interface PlaybookFacts {
+  day: string
+  label: string
+  pending: { tickets: number; bitacora: number }
+  fiado: number
+  visitingToday: string[]
+  sales: {
+    yesterday: { rev: number; tix: number }
+    d7: { rev: number; tix: number }
+    prev7: { rev: number; tix: number }
+    trendPct: number
+    sameWeekdayAvg: number
+    anomalyZ: number
+    avgTicket: number
+    peak: { from: number; to: number }
+    expectedToday: number
+  }
+  products: { id: string; name: string; stock: number; min: number; abc: 'A' | 'B' | 'C'; fToday: number; f7: number; daysLeft: number | null; suggest: number; margin7: number; units7: number }[]
+  risk: PlaybookFacts['products']
+  top: { name: string; margin7: number; units7: number }[]
+  orders: { supplier: string; lead: number; items: { name: string; qty: number }[] }[]
+  pairs: { a: string; b: string; n: number; lift: number }[]
 }
 
-/** Pide a la IA el mensaje del Inicio (lee el estado del negocio en el servidor). */
-export function fetchBriefing(goal: number) {
-  return invokeFn<Briefing & { tokens: number }>('ai-assistant', { mode: 'briefing', goal })
+export interface MiniPlaybook {
+  day: string
+  status: 'pendiente' | 'enviado' | 'listo' | 'sin_ia' | 'error'
+  facts: PlaybookFacts | null
+  text: { s: Record<PlaybookSlot, [string, string]>; c: string[]; src: 'ia' | 'local' } | null
+  model: string | null
+  tokens: number
+  cost_usd: number
+  generated_at: string
+}
+
+/** Plan de hoy de «Mini» (lo genera mini-daily a las 9:00 CR). Leerlo no llama a la IA. */
+export function useMiniPlaybook() {
+  return useQuery({
+    queryKey: ['mini-playbook', crDayKey()],
+    staleTime: 10 * 60_000,
+    queryFn: async (): Promise<MiniPlaybook | null> => {
+      const { data, error } = await supabase.from('mini_playbook').select('*').eq('day', crDayKey()).maybeSingle()
+      if (error) throw error
+      return (data as MiniPlaybook) ?? null
+    },
+  })
+}
+
+/** Regenera el plan de hoy ya mismo (una llamada directa; solo dueño o superadmin). */
+export function useRegenerateMini() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => invokeFn<{ status: string; cost_usd?: number; tokens?: number }>('mini-daily', { step: 'now' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['mini-playbook'] })
+      qc.invalidateQueries({ queryKey: ['ai-usage'] })
+    },
+  })
 }
 
 /** Pregunta al asistente. El cliente envía solo los últimos turnos de texto (menos tokens). */
