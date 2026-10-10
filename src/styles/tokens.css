@@ -1,0 +1,264 @@
+@import 'tailwindcss';
+
+/* ============================================================
+   MiniOS design tokens — inherited from RestOS, light + dark.
+   Dark is the default (:root). Light applies when the OS asks
+   for it (unless the user forced dark) or when the user forces
+   light via [data-theme="light"]. The theme toggle persists the
+   choice in localStorage as data-theme on <html>.
+   ============================================================ */
+
+:root {
+  /* Surfaces (dark default) */
+  --bg-deep: #0a0c10;
+  --bg-card: #12151c;
+  --bg-card-hover: #181c26;
+  --bg-surface: #1a1e28;
+  --border: #1f2937;
+  --border-accent: #2d3748;
+
+  /* Text */
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+
+  /* Accents (shared across themes) */
+  --accent-orange: #f97316;
+  --accent-orange-dim: #f9731622;
+  --accent-green: #22c55e;
+  --accent-green-dim: #22c55e1a;
+  --accent-blue: #3b82f6;
+  --accent-blue-dim: #3b82f61a;
+  --accent-red: #ef4444;
+  --accent-red-dim: #ef44441a;
+  --accent-purple: #a855f7;
+  --accent-purple-dim: #a855f71a;
+  --accent-amber: #f59e0b;
+  --accent-amber-dim: #f59e0b1a;
+  --accent-cyan: #06b6d4;
+  --accent-cyan-dim: #06b6d41a;
+
+  /* Shape */
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+
+  /* Type */
+  --font-sans-raw: 'DM Sans', system-ui, sans-serif;
+  --font-display-raw: 'Playfair Display', serif;
+  --font-mono-raw: 'JetBrains Mono', monospace;
+
+  color-scheme: dark;
+}
+
+/* Light values, shared by both "OS asked for light" and "user forced light" */
+:root[data-theme='light'],
+:root[data-theme='light'] * {
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    --bg-deep: #f5f7fa;
+    --bg-card: #ffffff;
+    --bg-card-hover: #f1f4f8;
+    --bg-surface: #eef2f7;
+    --border: #e2e8f0;
+    --border-accent: #cbd5e1;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    color-scheme: light;
+  }
+}
+
+:root[data-theme='light'] {
+  --bg-deep: #f5f7fa;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f1f4f8;
+  --bg-surface: #eef2f7;
+  --border: #e2e8f0;
+  --border-accent: #cbd5e1;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  color-scheme: light;
+}
+
+/* ============================================================
+   «Mostrador» — paleta de la app móvil (siempre clara).
+   Papel cálido, tinta casi negra, verde de marca y caléndula
+   para la acción principal. Todos los pares texto/fondo cumplen
+   WCAG AA (≥ 4.5:1). Ver docs/DESIGN_SYSTEM.md.
+   ============================================================ */
+:root {
+  --m-paper: #f3f0e8;
+  --m-paper-2: #efebe2;
+  --m-card: #ffffff;
+  --m-hair: #e6e1d6;
+  --m-hair-strong: #d8d2c4;
+  --m-ink: #1b1f1c;
+  --m-ink-2: #4a524d;
+  --m-ink-3: #636a65;
+  --m-brand: #0e5a47;
+  --m-brand-dark: #0a4536;
+  --m-brand-mid: #13705a;
+  --m-brand-tint: #ddebe4;
+  --m-brand-on: #cfe3da;
+  --m-marigold: #f5b83d;
+  --m-marigold-tint: #fdf3dc;
+  --m-warn: #8a4500;
+  --m-warn-tint: #fbebd2;
+  --m-danger: #a3241a;
+  --m-danger-tint: #f9e1de;
+  --m-ok: #15803d;
+  --m-font-display: 'Bricolage Grotesque', 'Instrument Sans', system-ui, sans-serif;
+  --m-font-body: 'Instrument Sans', system-ui, sans-serif;
+}
+
+/* Expose tokens to Tailwind utilities (tracks the live CSS vars) */
+@theme inline {
+  --color-deep: var(--bg-deep);
+  --color-card: var(--bg-card);
+  --color-card-hover: var(--bg-card-hover);
+  --color-surface: var(--bg-surface);
+  --color-line: var(--border);
+  --color-line-accent: var(--border-accent);
+
+  --color-fg: var(--text-primary);
+  --color-fg-secondary: var(--text-secondary);
+  --color-fg-muted: var(--text-muted);
+
+  --color-orange: var(--accent-orange);
+  --color-orange-dim: var(--accent-orange-dim);
+  --color-green: var(--accent-green);
+  --color-green-dim: var(--accent-green-dim);
+  --color-blue: var(--accent-blue);
+  --color-blue-dim: var(--accent-blue-dim);
+  --color-red: var(--accent-red);
+  --color-red-dim: var(--accent-red-dim);
+  --color-purple: var(--accent-purple);
+  --color-purple-dim: var(--accent-purple-dim);
+  --color-amber: var(--accent-amber);
+  --color-amber-dim: var(--accent-amber-dim);
+  --color-cyan: var(--accent-cyan);
+  --color-cyan-dim: var(--accent-cyan-dim);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius-lg);
+
+  --font-sans: var(--font-sans-raw);
+  --font-display: var(--font-display-raw);
+  --font-mono: var(--font-mono-raw);
+
+  /* Mostrador (app móvil) */
+  --color-paper: var(--m-paper);
+  --color-paper-2: var(--m-paper-2);
+  --color-hair: var(--m-hair);
+  --color-hair-strong: var(--m-hair-strong);
+  --color-ink: var(--m-ink);
+  --color-ink-2: var(--m-ink-2);
+  --color-ink-3: var(--m-ink-3);
+  --color-brand: var(--m-brand);
+  --color-brand-dark: var(--m-brand-dark);
+  --color-brand-mid: var(--m-brand-mid);
+  --color-brand-tint: var(--m-brand-tint);
+  --color-brand-on: var(--m-brand-on);
+  --color-marigold: var(--m-marigold);
+  --color-marigold-tint: var(--m-marigold-tint);
+  --color-warn: var(--m-warn);
+  --color-warn-tint: var(--m-warn-tint);
+  --color-danger: var(--m-danger);
+  --color-danger-tint: var(--m-danger-tint);
+  --color-ok: var(--m-ok);
+  --font-display-m: var(--m-font-display);
+  --font-body-m: var(--m-font-body);
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans-raw);
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-accent);
+  border-radius: 4px;
+}
+
+/* Barra de estado falsa del mockup: fuera en celular real y en la PWA instalada. */
+@media (pointer: coarse), (display-mode: standalone) {
+  .fake-statusbar {
+    display: none;
+  }
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-up {
+  animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Raíz de la app móvil (MobileApp, Caja, Asistente, Login) */
+.mostrador {
+  font-family: var(--m-font-body);
+  background: var(--m-paper);
+  color: var(--m-ink);
+  color-scheme: light;
+  line-height: 1.45;
+}
+.mostrador .font-display-m {
+  font-family: var(--m-font-display);
+  letter-spacing: -0.02em;
+}
+/* Cifras alineadas en columnas */
+.mostrador .tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+/* iOS hace zoom en inputs < 16px */
+.mostrador input,
+.mostrador textarea,
+.mostrador select {
+  font-size: max(16px, 1em);
+}
+.mostrador :focus-visible {
+  outline: 2px solid var(--m-brand);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mostrador *,
+  .mostrador *::before,
+  .mostrador *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

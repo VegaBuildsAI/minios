@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MiniOS — Solutions Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg-deep:#0a0c10; --bg-card:#12151c; --bg-card-hover:#181c26; --bg-surface:#1a1e28;
+  --border:#1f2937; --border-accent:#2d3748;
+  --text-primary:#f1f5f9; --text-secondary:#94a3b8; --text-muted:#64748b;
+  --accent-orange:#f97316; --accent-orange-dim:#f9731622;
+  --accent-green:#22c55e; --accent-green-dim:#22c55e1a;
+  --accent-blue:#3b82f6; --accent-blue-dim:#3b82f61a;
+  --accent-red:#ef4444; --accent-red-dim:#ef44441a;
+  --accent-purple:#a855f7; --accent-purple-dim:#a855f71a;
+  --accent-amber:#f59e0b; --accent-amber-dim:#f59e0b1a;
+  --accent-cyan:#06b6d4; --accent-cyan-dim:#06b6d41a;
+  --radius:12px; --radius-sm:8px; --radius-lg:16px;
+  --font-sans:'DM Sans',system-ui,sans-serif;
+  --font-display:'Playfair Display',serif;
+  --font-mono:'JetBrains Mono',monospace;
+}
+[data-theme="light"]{
+  --bg-deep:#f5f7fa; --bg-card:#ffffff; --bg-card-hover:#f1f4f8; --bg-surface:#eef2f7;
+  --border:#e2e8f0; --border-accent:#cbd5e1;
+  --text-primary:#0f172a; --text-secondary:#475569; --text-muted:#94a3b8;
+}
+html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased}
+body{font-family:var(--font-sans);background:var(--bg-deep);color:var(--text-primary);overflow-x:hidden;line-height:1.6;transition:background .3s,color .3s}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-accent);border-radius:4px}
+
+/* Theme toggle */
+.theme-toggle{position:fixed;top:1.25rem;right:1.25rem;z-index:100;width:42px;height:42px;border-radius:999px;
+  background:var(--bg-card);border:1px solid var(--border);color:var(--text-secondary);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:1.1rem;transition:all .2s}
+.theme-toggle:hover{border-color:var(--border-accent);color:var(--text-primary)}
+
+/* HERO */
+.hero{min-height:92vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:2rem;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-40%;left:-20%;width:140%;height:140%;
+  background:radial-gradient(ellipse at 30% 20%,var(--accent-orange-dim) 0%,transparent 50%),
+             radial-gradient(ellipse at 70% 80%,var(--accent-blue-dim) 0%,transparent 50%);pointer-events:none}
+.hero-badge{display:inline-flex;align-items:center;gap:.5rem;padding:.4rem 1rem;background:var(--accent-orange-dim);
+  border:1px solid #f9731633;border-radius:999px;font-size:.75rem;font-weight:600;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--accent-orange);margin-bottom:2rem;animation:fadeUp .8s ease both}
+.hero h1{font-family:var(--font-display);font-size:clamp(2.6rem,7vw,5rem);font-weight:900;line-height:1.05;
+  letter-spacing:-.02em;margin-bottom:1.5rem;animation:fadeUp .8s .15s ease both}
+.hero h1 span{background:linear-gradient(135deg,var(--accent-orange),#fb923c,var(--accent-amber));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:clamp(1rem,2.5vw,1.3rem);color:var(--text-secondary);max-width:640px;line-height:1.7;
+  animation:fadeUp .8s .3s ease both;margin-bottom:3rem}
+.hero-stats{display:flex;gap:2.5rem;flex-wrap:wrap;justify-content:center;animation:fadeUp .8s .45s ease both}
+.hero-stat-num{font-family:var(--font-mono);font-size:1.8rem;font-weight:700;color:var(--accent-orange)}
+.hero-stat-label{font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.1em;margin-top:.25rem}
+
+section{padding:5rem 1.5rem}
+.section-inner{max-width:1200px;margin:0 auto}
+.section-label{display:inline-flex;align-items:center;gap:.5rem;font-size:.7rem;font-weight:600;letter-spacing:.15em;
+  text-transform:uppercase;color:var(--text-muted);margin-bottom:1rem}
+.section-label .dot{width:6px;height:6px;border-radius:50%;background:var(--accent-orange)}
+.section-title{font-family:var(--font-display);font-size:clamp(1.8rem,4vw,2.8rem);font-weight:800;line-height:1.15;
+  margin-bottom:1rem;letter-spacing:-.01em}
+.section-desc{color:var(--text-secondary);max-width:600px;font-size:1.05rem;margin-bottom:3rem}
+.alt{background:var(--bg-card);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+
+/* MODULES */
+.modules-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1.25rem}
+.mod-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.75rem;
+  transition:all .35s cubic-bezier(.22,1,.36,1);position:relative;overflow:hidden}
+.alt .mod-card{background:var(--bg-surface)}
+.mod-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--card-accent);opacity:0;transition:opacity .35s}
+.mod-card:hover{transform:translateY(-4px);border-color:var(--border-accent)}
+.mod-card:hover::before{opacity:1}
+.mod-card-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.25rem}
+.mod-icon{width:44px;height:44px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;font-size:1.2rem;background:var(--icon-bg)}
+.mod-badges{display:flex;align-items:center;gap:.5rem}
+.mod-id{font-family:var(--font-mono);font-size:.65rem;color:var(--text-muted)}
+.mod-priority{font-family:var(--font-mono);font-size:.65rem;font-weight:500;padding:.2rem .6rem;border-radius:999px;
+  background:var(--accent-orange-dim);color:var(--accent-orange)}
+.mod-card h3{font-size:1.15rem;font-weight:700;margin-bottom:.5rem}
+.mod-card p{font-size:.86rem;color:var(--text-secondary);line-height:1.65;margin-bottom:1.25rem}
+.mod-features{display:flex;flex-wrap:wrap;gap:.4rem}
+.mod-feat{font-size:.7rem;padding:.25rem .6rem;border-radius:999px;background:var(--bg-surface);border:1px solid var(--border);color:var(--text-muted);font-weight:500}
+.alt .mod-feat{background:var(--bg-card)}
+
+/* FLOW */
+.flows-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:1.25rem}
+.flow-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem}
+.alt .flow-card{background:var(--bg-surface)}
+.flow-head{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:1.25rem}
+.flow-name{font-size:.98rem;font-weight:700}
+.flow-trigger{font-size:.66rem;font-weight:600;padding:.2rem .6rem;border-radius:999px;background:var(--fl-dim);color:var(--fl)}
+.flow-track{display:flex;gap:0;overflow-x:auto;padding-bottom:.5rem;scrollbar-width:none}
+.flow-track::-webkit-scrollbar{display:none}
+.flow-step{flex:0 0 120px;display:flex;flex-direction:column;align-items:center;text-align:center;position:relative;padding:0 .25rem}
+.flow-step:not(:last-child)::after{content:'';position:absolute;top:24px;left:calc(50% + 24px);width:calc(100% - 48px);height:2px;
+  background:linear-gradient(90deg,var(--fl),transparent)}
+.flow-dot{width:48px;height:48px;border-radius:50%;background:var(--bg-card);border:2px solid var(--fl);display:flex;
+  align-items:center;justify-content:center;font-size:1.15rem;margin-bottom:.75rem;position:relative;z-index:1}
+.alt .flow-dot{background:var(--bg-surface)}
+.flow-step-title{font-weight:700;font-size:.76rem;margin-bottom:.15rem}
+.flow-step-desc{font-size:.66rem;color:var(--text-muted);line-height:1.4}
+
+/* LIVE PREVIEW */
+.preview-container{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-top:2rem}
+.alt .preview-container{background:var(--bg-surface)}
+.preview-chrome{display:flex;align-items:center;gap:.5rem;padding:.75rem 1.25rem;background:var(--bg-surface);border-bottom:1px solid var(--border)}
+.alt .preview-chrome{background:var(--bg-card)}
+.preview-chrome-dot{width:8px;height:8px;border-radius:50%}
+.preview-chrome-title{font-size:.7rem;color:var(--text-muted);margin-left:.5rem;font-family:var(--font-mono)}
+.preview-tabs{display:flex;border-bottom:1px solid var(--border);background:var(--bg-surface);overflow-x:auto;scrollbar-width:none}
+.alt .preview-tabs{background:var(--bg-card)}
+.preview-tabs::-webkit-scrollbar{display:none}
+.preview-tab{padding:.75rem 1.25rem;font-size:.78rem;font-weight:500;color:var(--text-muted);cursor:pointer;
+  border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
+.preview-tab:hover{color:var(--text-secondary)}
+.preview-tab.active{color:var(--accent-orange);border-bottom-color:var(--accent-orange)}
+.preview-body{padding:1.5rem;min-height:440px}
+
+/* POS mock */
+.pos-layout{display:grid;grid-template-columns:1fr 300px;gap:1.25rem;height:400px}
+@media(max-width:720px){.pos-layout{grid-template-columns:1fr;height:auto}}
+.pos-cats{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem}
+.pos-cat{padding:.35rem .8rem;border-radius:999px;font-size:.72rem;font-weight:600;background:var(--bg-surface);
+  border:1px solid var(--border);color:var(--text-muted);cursor:pointer}
+.alt .pos-cat{background:var(--bg-card)}
+.pos-cat.active{background:var(--accent-orange);border-color:var(--accent-orange);color:#fff}
+.pos-items{display:grid;grid-template-columns:repeat(auto-fill,minmax(115px,1fr));gap:.6rem;overflow-y:auto;max-height:340px}
+.pos-item{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;cursor:pointer;transition:all .2s}
+.alt .pos-item{background:var(--bg-card)}
+.pos-item:hover{border-color:#f9731655}
+.pos-item-name{font-size:.76rem;font-weight:600;margin-bottom:.25rem}
+.pos-item-price{font-size:.72rem;color:var(--accent-orange);font-family:var(--font-mono)}
+.pos-item-stock{font-size:.62rem;color:var(--text-muted);font-family:var(--font-mono);margin-top:.2rem}
+.pos-sidebar{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;display:flex;flex-direction:column}
+.alt .pos-sidebar{background:var(--bg-card)}
+.pos-sidebar-title{font-size:.78rem;font-weight:700;margin-bottom:.75rem;display:flex;justify-content:space-between}
+.pos-sidebar-title span{color:var(--text-muted);font-weight:400}
+.pos-order{flex:1;display:flex;flex-direction:column;gap:.4rem;overflow-y:auto;margin-bottom:.75rem}
+.pos-order-item{display:flex;justify-content:space-between;padding:.45rem .5rem;background:var(--bg-card);border-radius:var(--radius-sm);font-size:.74rem}
+.alt .pos-order-item{background:var(--bg-surface)}
+.pos-order-qty{color:var(--accent-orange);font-family:var(--font-mono);font-weight:600}
+.pos-order-price{font-family:var(--font-mono);color:var(--accent-orange);font-weight:600;font-size:.72rem}
+.pos-totals{border-top:1px solid var(--border);padding-top:.75rem;display:flex;flex-direction:column;gap:.3rem}
+.pos-total-row{display:flex;justify-content:space-between;font-size:.78rem}
+.pos-total-row span:last-child{font-family:var(--font-mono)}
+.pos-total-row.grand{font-weight:700;font-size:.95rem;color:var(--accent-orange);margin-top:.25rem}
+.pos-pays{display:flex;gap:.4rem;margin-top:.75rem;flex-wrap:wrap}
+.pos-pay{flex:1;min-width:64px;padding:.5rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card);
+  color:var(--text-secondary);font-size:.68rem;font-weight:600;cursor:pointer;font-family:var(--font-sans);text-align:center}
+.alt .pos-pay{background:var(--bg-surface)}
+.pos-pay.primary{background:var(--accent-green);border-color:var(--accent-green);color:#fff}
+
+/* Inventory mock */
+.inv-table{width:100%;border-collapse:collapse;font-size:.76rem}
+.inv-table th{text-align:left;padding:.55rem .6rem;color:var(--text-muted);font-weight:600;font-size:.66rem;
+  text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border)}
+.inv-table td{padding:.55rem .6rem;border-bottom:1px solid var(--border)}
+.inv-table td.num{font-family:var(--font-mono);text-align:right}
+.inv-badge{display:inline-flex;padding:.15rem .5rem;border-radius:999px;font-size:.62rem;font-weight:600}
+.inv-badge.ok{background:var(--accent-green-dim);color:var(--accent-green)}
+.inv-badge.low{background:var(--accent-amber-dim);color:var(--accent-amber)}
+.inv-badge.out{background:var(--accent-red-dim);color:var(--accent-red)}
+
+/* Panel / KPIs mock */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;margin-bottom:1.25rem}
+.kpi{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem}
+.alt .kpi{background:var(--bg-card)}
+.kpi-label{font-size:.66rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.35rem}
+.kpi-val{font-family:var(--font-mono);font-size:1.35rem;font-weight:700}
+.kpi-change{font-size:.66rem;font-family:var(--font-mono);margin-top:.25rem;font-weight:600}
+.kpi-change.up{color:var(--accent-green)}
+.kpi-change.down{color:var(--accent-red)}
+.chart{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem}
+.alt .chart{background:var(--bg-card)}
+.chart-title{font-size:.78rem;font-weight:600;margin-bottom:.75rem;display:flex;justify-content:space-between}
+.chart-title span{font-size:.66rem;color:var(--text-muted);font-family:var(--font-mono)}
+.chart-bars{display:flex;align-items:flex-end;gap:.5rem;height:130px}
+.chart-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:.3rem;height:100%}
+.chart-bar{width:100%;border-radius:4px 4px 0 0;background:var(--accent-orange);align-self:flex-end;margin-top:auto;min-height:4px}
+.chart-bar-label{font-size:.6rem;color:var(--text-muted);font-family:var(--font-mono)}
+
+/* DB schema */
+.db-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem}
+.db-group{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem}
+.alt .db-group{background:var(--bg-surface)}
+.db-group-title{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:.85rem}
+.db-table{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:.7rem;margin-bottom:.6rem}
+.alt .db-table{background:var(--bg-card)}
+.db-table-name{font-family:var(--font-mono);font-size:.8rem;font-weight:600;color:var(--accent-orange)}
+.db-table-cols{font-family:var(--font-mono);font-size:.65rem;color:var(--text-muted);margin-top:.25rem;line-height:1.5}
+
+/* STACK */
+.stack-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem}
+.stack-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem}
+.alt .stack-card{background:var(--bg-surface)}
+.stack-card:hover{border-color:var(--border-accent)}
+.stack-layer{font-family:var(--font-mono);font-size:.65rem;text-transform:uppercase;letter-spacing:.12em;margin-bottom:.5rem;font-weight:500;color:var(--sc)}
+.stack-tech{font-weight:700;font-size:1rem;margin-bottom:.35rem}
+.stack-why{font-size:.78rem;color:var(--text-muted);line-height:1.5}
+
+/* ROADMAP */
+.roadmap{display:flex;flex-direction:column;position:relative;padding-left:2rem}
+.roadmap::before{content:'';position:absolute;left:11px;top:12px;bottom:12px;width:2px;background:linear-gradient(var(--border),#f9731655,var(--border))}
+.roadmap-item{display:flex;gap:1.5rem;padding:1.25rem 0;position:relative}
+.roadmap-dot{width:24px;height:24px;border-radius:50%;background:var(--bg-card);border:2px solid var(--rm);display:flex;
+  align-items:center;justify-content:center;position:absolute;left:-2rem;top:1.5rem;z-index:1}
+.roadmap-dot::after{content:'';width:8px;height:8px;border-radius:50%;background:var(--rm)}
+.roadmap-week{font-family:var(--font-mono);font-size:.7rem;color:var(--rm);font-weight:500;margin-bottom:.35rem}
+.roadmap-title{font-weight:700;font-size:1.05rem;margin-bottom:.35rem}
+.roadmap-desc{font-size:.85rem;color:var(--text-secondary);line-height:1.6}
+.roadmap-exit{font-size:.74rem;color:var(--text-muted);margin-top:.5rem;font-style:italic}
+
+.footer{padding:3rem 1.5rem;text-align:center;border-top:1px solid var(--border)}
+.footer-brand{font-family:var(--font-display);font-size:1.2rem;font-weight:800;margin-bottom:.5rem}
+.footer-brand span{color:var(--accent-orange)}
+.footer-text{font-size:.75rem;color:var(--text-muted)}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+.reveal{opacity:0;transform:translateY(30px);transition:all .7s cubic-bezier(.22,1,.36,1)}
+.reveal.visible{opacity:1;transform:translateY(0)}
+@media(max-width:520px){section{padding:3rem 1rem}.modules-grid,.flows-grid,.stack-grid,.db-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<button class="theme-toggle" onclick="toggleTheme()" id="themeBtn" title="Cambiar tema">☀️</button>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+    Panel de Control · v0.1 · Costa Rica
+  </div>
+  <h1>Mini<span>OS</span></h1>
+  <p class="hero-sub">Micro-ERP para minisúper. Toda la operación —caja, inventario, proveedores, bitácora y reportes— desde el celular, con una capa de IA que convierte lo informal en datos. 100% Supabase.</p>
+  <div class="hero-stats">
+    <div class="hero-stat"><div class="hero-stat-num">7</div><div class="hero-stat-label">Módulos</div></div>
+    <div class="hero-stat"><div class="hero-stat-num">$0</div><div class="hero-stat-label">Costo inicial</div></div>
+    <div class="hero-stat"><div class="hero-stat-num">100%</div><div class="hero-stat-label">Supabase</div></div>
+    <div class="hero-stat"><div class="hero-stat-num">PWA</div><div class="hero-stat-label">Instalable</div></div>
+  </div>
+</section>
+
+<!-- FLOWS -->
+<section class="alt">
+  <div class="section-inner reveal">
+    <div class="section-label"><span class="dot"></span> Flujos</div>
+    <div class="section-title">Cómo se mueve la operación</div>
+    <div class="section-desc">Del gesto informal al dato estructurado — con la IA cerrando cada lazo.</div>
+    <div class="flows-grid" id="flowsGrid"></div>
+  </div>
+</section>
+
+<!-- LIVE PREVIEW -->
+<section>
+  <div class="section-inner reveal">
+    <div class="section-label"><span class="dot"></span> Interfaz</div>
+    <div class="section-title">Míralo en acción</div>
+    <div class="section-desc">Mockups de los módulos clave — tocá las pestañas para explorar.</div>
+    <div class="preview-container">
+      <div class="preview-chrome">
+        <div class="preview-chrome-dot" style="background:var(--accent-red)"></div>
+        <div class="preview-chrome-dot" style="background:var(--accent-amber)"></div>
+        <div class="preview-chrome-dot" style="background:var(--accent-green)"></div>
+        <div class="preview-chrome-title">minios.local — MiniOS</div>
+      </div>
+      <div class="preview-tabs">
+        <div class="preview-tab active" onclick="showTab('pos',this)">🛒 Caja</div>
+        <div class="preview-tab" onclick="showTab('inv',this)">📦 Inventario</div>
+        <div class="preview-tab" onclick="showTab('panel',this)">📈 Reportes</div>
+      </div>
+      <div class="preview-body" id="previewBody"></div>
+    </div>
+  </div>
+</section>
+
+<!-- MODULES -->
+<section class="alt">
+  <div class="section-inner reveal">
+    <div class="section-label"><span class="dot"></span> Módulos</div>
+    <div class="section-title">Todo lo que el minisúper necesita</div>
+    <div class="section-desc">Siete módulos cubren el ciclo completo, con una capa de IA transversal.</div>
+    <div class="modules-grid" id="modulesGrid"></div>
+  </div>
+</section>
+
+<!-- DB -->
+<section>
+  <div class="section-inner reveal">
+    <div class="section-label"><span class="dot"></span> Base de datos</div>
+    <div class="section-title">El esquema en Supabase Postgres</div>
+    <div class="section-desc">12 tablas con Row Level Security por rol. profiles extiende auth.users.</div>
+    <div class="db-grid" id="dbGrid"></div>
+  </div>
+</section>
+
+<!-- STACK -->
+<section class="alt">
+  <div class="section-inner reveal">
+    <div class="section-label"><span class="dot"></span> Stack / Infra</div>
+    <div class="section-title">100% Supabase, sin otro deployer</div>
+    <div class="section-desc">Costo cero en la fase inicial: local con Supabase CLI, producción en Supabase Cloud + Hosting.</div>
+    <div class="stack-grid" id="stackGrid"></div>
+  </div>
+</section>
+
+<!-- ROADMAP -->
+<section>
+  <div class="section-inner reveal">
+    <div class="section-label"><span class="dot"></span> Plan</div>
+    <div class="section-title">Ruta de construcción local-first</div>
+    <div class="section-desc">Del Panel + design system al deploy en Supabase Cloud, validando cada módulo en local.</div>
+    <div class="roadmap" id="roadmap"></div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="footer-brand">Mini<span>OS</span></div>
+  <div class="footer-text">AXIO Creator · Costa Rica · 2026 · Micro-ERP para Minisúper</div>
+</footer>
+
+<script>
+// ── Data (mirror of src/config/solution-map.ts) ──
+const ACC={orange:['var(--accent-orange)','var(--accent-orange-dim)'],green:['var(--accent-green)','var(--accent-green-dim)'],
+  blue:['var(--accent-blue)','var(--accent-blue-dim)'],red:['var(--accent-red)','var(--accent-red-dim)'],
+  purple:['var(--accent-purple)','var(--accent-purple-dim)'],amber:['var(--accent-amber)','var(--accent-amber-dim)'],
+  cyan:['var(--accent-cyan)','var(--accent-cyan-dim)']};
+
+const modules=[
+  {id:'M1',icon:'🛒',name:'Caja (POS)',p:'P0',a:'orange',d:'Punto de venta lineal: búsqueda o escaneo, carrito, IVA 13%, y pagos en efectivo, SINPE, tarjeta o fíado. Turno con apertura y cierre por conteo.',f:['Escaneo cámara','IVA 13%','SINPE / Fíado','Cambio','Colilla PDF','Turno']},
+  {id:'M2',icon:'📦',name:'Inventario en tiempo real',p:'P0',a:'green',d:'Catálogo con costo, precio y stock. Deducción automática en cada venta, stock crítico con alerta, ajuste manual e historial.',f:['Auto-deducción','Stock crítico','Merma / robo','Historial','SKU / código']},
+  {id:'M3',icon:'🚚',name:'Proveedores & Compras',p:'P1',a:'blue',d:'Directorio con días de visita, órdenes sugeridas, recepción que actualiza stock y alerta si el precio difiere del histórico.',f:['Directorio','Orden sugerida','Recepción → stock','Alerta de precio']},
+  {id:'M4',icon:'📓',name:'Bitácora (captura informal)',p:'P1',a:'purple',d:'Reemplaza el cuaderno. Texto, foto (OCR) o voz (STT); la IA arma un borrador editable que el usuario confirma antes de cargar a la BD.',f:['Texto libre','Foto → OCR','Voz → STT','Borrador editable','Confirma → BD']},
+  {id:'M5',icon:'📈',name:'Reportes & Cuadre',p:'P1',a:'amber',d:'Ventas por período, más vendidos por volumen y margen, cuentas por cobrar, cuadre de turno y export CSV / PDF.',f:['Período custom','Margen','Cuentas por cobrar','Cuadre de caja','CSV / PDF']},
+  {id:'M6',icon:'⚙️',name:'Configuración',p:'P1',a:'cyan',d:'Perfil del negocio, IVA 13% CR, moneda CRC / USD, gestión de usuarios y roles, y notificaciones.',f:['Perfil','IVA / Moneda','Usuarios & roles','Notificaciones']},
+  {id:'M7',icon:'🤖',name:'Capa de IA (transversal)',p:'P1',a:'red',d:'No es un chatbot: motor de triggers + acciones embebido en cada módulo y un cron diario, desde Supabase Edge Functions.',f:['Triggers de stock','Sugerir orden','Resumen diario','Pregunta en lenguaje natural']},
+];
+
+const flows=[
+  {name:'Venta → Inventario',a:'orange',t:'Cierre de venta',steps:[['🔎','Buscar','nombre/código/cámara'],['🧺','Carrito','subtotal + IVA 13%'],['💳','Cobrar','efectivo/SINPE/fíado'],['📉','Deducir','stock_movements'],['⚠️','Alerta','si stock ≤ mínimo']]},
+  {name:'Captura → IA → BD',a:'purple',t:'Nota en Bitácora',steps:[['✍️','Captura','texto/foto/audio'],['🧠','IA extrae','OCR / STT'],['📝','Borrador','editable'],['✅','Confirmar','usuario valida'],['🗄️','Carga','a la BD']]},
+  {name:'Compra a proveedor',a:'blue',t:'Visita / stock bajo',steps:[['📅','Trigger','día o mínimo'],['🧾','Orden','IA sugiere'],['📦','Recepción','pedido vs. recibido'],['📈','Stock','entra al inventario'],['💰','Precio','alerta si difiere']]},
+  {name:'IA proactiva (cron)',a:'red',t:'1× al día',steps:[['🗃️','Analiza','ventas y stock'],['🏆','Rentables','top por margen'],['⏳','Mínimos','pedidos anticipados'],['💬','Resumen','lenguaje natural']]},
+];
+
+const db=[
+  {g:'Usuarios',t:[['profiles','id, full_name, role, is_active']]},
+  {g:'Catálogo',t:[['products','name, sku, barcode, cost_price, sale_price, stock_qty, min_qty'],['categories','name, color, icon, sort_order'],['suppliers','name, phone, visit_days, notes']]},
+  {g:'Ventas',t:[['sales','staff_id, payment_method, subtotal, tax, total, shift_id'],['sale_items','sale_id, product_id, qty, unit_price'],['customers','name, phone, balance_debt']]},
+  {g:'Inventario',t:[['stock_movements','product_id, delta, reason, reference_id']]},
+  {g:'Compras',t:[['purchase_orders','supplier_id, status, total, received_at'],['purchase_items','po_id, product_id, qty_ordered, qty_received, unit_cost']]},
+  {g:'Caja',t:[['shifts','staff_id, opening_cash, closing_cash, total_sales']]},
+  {g:'Bitácora',t:[['captures','type, raw_input, parsed_json, status, confirmed_at']]},
+];
+
+const stack=[
+  ['Frontend','React 18 + Vite + TS','SPA responsive, mobile-first','orange'],
+  ['UI','Tailwind + shadcn/ui','Design system heredado, claro/oscuro','blue'],
+  ['State','Zustand','Un store por módulo','green'],
+  ['Backend','Supabase Postgres','Base de datos + RLS por rol','cyan'],
+  ['Auth','Supabase Auth','Magic link + roles','purple'],
+  ['Storage','Supabase Storage','Fotos y audios de bitácora','amber'],
+  ['Realtime','Supabase Realtime','Alertas de stock en vivo','green'],
+  ['IA / Cron','Edge Functions','Triggers + resumen diario','red'],
+  ['Deploy','Supabase Hosting','100% Supabase, sin otro deployer','blue'],
+];
+
+const roadmap=[
+  ['orange','Fase 0','Panel + Design system','Scaffold Vite+TS+Tailwind, tokens claro/oscuro, Panel de Control (mapa visual) y este showcase.','Salida: /control muestra todo el paquete, responsive.'],
+  ['blue','Fase 1','Foundation local','Supabase CLI + schema + RLS + seed 50 productos CR + auth magic link (superadmin).','Salida: supabase start + vite dev juntos; login por rol.'],
+  ['green','Fase 2','Panel en vivo + Caja + Inventario','Panel cableado a Supabase; venta → deducción de stock → alerta bajo mínimo.','Salida: flujo P0 punta a punta en local.'],
+  ['purple','Fase 3','Proveedores + Bitácora','Órdenes y recepción; captura texto/foto(OCR)/voz(STT) → borrador → BD.','Salida: captura informal estructurada.'],
+  ['amber','Fase 4','Reportes + Config + IA','Reportes y cuadre; Edge Functions de IA (cron, sugerir orden, consulta).','Salida: resumen diario y sugerencias.'],
+  ['cyan','Fase 5','PWA + Deploy','manifest + service worker; deploy a Supabase Cloud + Hosting.','Salida: app en producción, instalable.'],
+];
+
+// ── Renderers ──
+document.getElementById('modulesGrid').innerHTML=modules.map(m=>`
+  <div class="mod-card" style="--card-accent:${ACC[m.a][0]};--icon-bg:${ACC[m.a][1]}">
+    <div class="mod-card-header">
+      <div class="mod-icon">${m.icon}</div>
+      <div class="mod-badges"><span class="mod-id">${m.id}</span><span class="mod-priority">${m.p}</span></div>
+    </div>
+    <h3>${m.name}</h3><p>${m.d}</p>
+    <div class="mod-features">${m.f.map(f=>`<span class="mod-feat">${f}</span>`).join('')}</div>
+  </div>`).join('');
+
+document.getElementById('flowsGrid').innerHTML=flows.map(fl=>`
+  <div class="flow-card" style="--fl:${ACC[fl.a][0]};--fl-dim:${ACC[fl.a][1]}">
+    <div class="flow-head"><span class="flow-name">${fl.name}</span><span class="flow-trigger">${fl.t}</span></div>
+    <div class="flow-track">${fl.steps.map(s=>`
+      <div class="flow-step"><div class="flow-dot">${s[0]}</div>
+        <div class="flow-step-title">${s[1]}</div><div class="flow-step-desc">${s[2]}</div></div>`).join('')}
+    </div>
+  </div>`).join('');
+
+document.getElementById('dbGrid').innerHTML=db.map(grp=>`
+  <div class="db-group"><div class="db-group-title">${grp.g}</div>
+    ${grp.t.map(t=>`<div class="db-table"><div class="db-table-name">${t[0]}</div><div class="db-table-cols">${t[1]}</div></div>`).join('')}
+  </div>`).join('');
+
+document.getElementById('stackGrid').innerHTML=stack.map(s=>`
+  <div class="stack-card" style="--sc:${ACC[s[3]][0]}">
+    <div class="stack-layer">${s[0]}</div><div class="stack-tech">${s[1]}</div><div class="stack-why">${s[2]}</div>
+  </div>`).join('');
+
+document.getElementById('roadmap').innerHTML=roadmap.map(r=>`
+  <div class="roadmap-item" style="--rm:${ACC[r[0]][0]}"><div class="roadmap-dot"></div>
+    <div><div class="roadmap-week">${r[1]}</div><div class="roadmap-title">${r[2]}</div>
+      <div class="roadmap-desc">${r[3]}</div><div class="roadmap-exit">${r[4]}</div></div>
+  </div>`).join('');
+
+// ── Live preview tabs ──
+const prods=[
+  {n:'Arroz 1kg',pr:'₡900',st:38,min:10},{n:'Frijol 900g',pr:'₡1,350',st:24,min:8},
+  {n:'Aceite 1L',pr:'₡2,100',st:6,min:8},{n:'Azúcar 2kg',pr:'₡1,800',st:19,min:6},
+  {n:'Café 500g',pr:'₡3,200',st:0,min:5},{n:'Leche 1L',pr:'₡950',st:4,min:12},
+  {n:'Huevos 30u',pr:'₡3,600',st:15,min:5},{n:'Pan cuadrado',pr:'₡1,450',st:9,min:6},
+  {n:'Tortillas',pr:'₡800',st:22,min:8},{n:'Gaseosa 2.5L',pr:'₡1,700',st:31,min:10},
+  {n:'Jabón barra',pr:'₡650',st:27,min:10},{n:'Papel higiénico',pr:'₡2,400',st:12,min:6},
+];
+const stFor=p=>p.st===0?['out','Agotado']:p.st<=p.min?['low','Bajo']:['ok','OK'];
+
+function renderPOS(){
+  const cats=['Todos','Granos','Bebidas','Lácteos','Limpieza'];
+  const order=[['Arroz 1kg',2,'₡1,800'],['Aceite 1L',1,'₡2,100'],['Leche 1L',3,'₡2,850'],['Café 500g',1,'₡3,200']];
+  return `<div class="pos-layout">
+    <div>
+      <div class="pos-cats">${cats.map((c,i)=>`<div class="pos-cat${i===0?' active':''}">${c}</div>`).join('')}</div>
+      <div class="pos-items">${prods.map(p=>`
+        <div class="pos-item"><div class="pos-item-name">${p.n}</div><div class="pos-item-price">${p.pr}</div>
+          <div class="pos-item-stock">stock ${p.st}</div></div>`).join('')}</div>
+    </div>
+    <div class="pos-sidebar">
+      <div class="pos-sidebar-title">Carrito <span>Turno #12</span></div>
+      <div class="pos-order">${order.map(o=>`
+        <div class="pos-order-item"><div><span class="pos-order-qty">${o[1]}×</span> ${o[0]}</div><div class="pos-order-price">${o[2]}</div></div>`).join('')}</div>
+      <div class="pos-totals">
+        <div class="pos-total-row"><span>Subtotal</span><span>₡8,805</span></div>
+        <div class="pos-total-row"><span>IVA (13%)</span><span>₡1,145</span></div>
+        <div class="pos-total-row grand"><span>Total</span><span>₡9,950</span></div>
+      </div>
+      <div class="pos-pays">
+        <div class="pos-pay">Efectivo</div><div class="pos-pay">SINPE</div><div class="pos-pay">Fíado</div>
+        <div class="pos-pay primary">💳 Cobrar</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderINV(){
+  return `<table class="inv-table">
+    <thead><tr><th>Producto</th><th style="text-align:right">Precio</th><th style="text-align:right">Stock</th><th style="text-align:right">Mín</th><th>Estado</th></tr></thead>
+    <tbody>${prods.map(p=>{const s=stFor(p);return `<tr>
+      <td>${p.n}</td><td class="num">${p.pr}</td><td class="num">${p.st}</td><td class="num">${p.min}</td>
+      <td><span class="inv-badge ${s[0]}">${s[1]}</span></td></tr>`}).join('')}</tbody></table>`;
+}
+
+function renderPanel(){
+  const bars=[62,48,80,55,92,70,44];const days=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+  return `
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-label">Ventas hoy</div><div class="kpi-val" style="color:var(--accent-green)">₡87,400</div><div class="kpi-change up">↑ 9.2%</div></div>
+      <div class="kpi"><div class="kpi-label">Tickets</div><div class="kpi-val">54</div><div class="kpi-change up">↑ 6%</div></div>
+      <div class="kpi"><div class="kpi-label">Stock crítico</div><div class="kpi-val" style="color:var(--accent-amber)">3</div><div class="kpi-change down">Aceite, Leche, Café</div></div>
+      <div class="kpi"><div class="kpi-label">Fíado pendiente</div><div class="kpi-val">₡42,100</div><div class="kpi-change down">↑ ₡3,500</div></div>
+    </div>
+    <div class="chart"><div class="chart-title">Ventas de la semana <span>16–22 Sep</span></div>
+      <div class="chart-bars">${bars.map((b,i)=>`<div class="chart-bar-wrap"><div class="chart-bar" style="height:${b}%"></div><div class="chart-bar-label">${days[i]}</div></div>`).join('')}</div>
+    </div>`;
+}
+
+const renders={pos:renderPOS,inv:renderINV,panel:renderPanel};
+function showTab(tab,el){document.querySelectorAll('.preview-tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');document.getElementById('previewBody').innerHTML=renders[tab]();}
+showTab('pos',document.querySelector('.preview-tab'));
+
+// ── Theme ──
+function toggleTheme(){
+  const cur=document.documentElement.getAttribute('data-theme');
+  const next=cur==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',next);
+  document.getElementById('themeBtn').textContent=next==='dark'?'☀️':'🌙';
+}
+
+// ── Scroll reveal ──
+const obs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');obs.unobserve(e.target)}}),{threshold:0.1,rootMargin:'0px 0px -60px 0px'});
+document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+</script>
+</body>
+</html>
