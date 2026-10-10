@@ -26,7 +26,7 @@ export function BitacoraCard() {
   const regen = useRegenerateMini()
   const planState =
     !plan
-      ? 'Sin plan todavía (se genera a las 9:00)'
+      ? 'Sin plan todavía (se genera a las 8:00)'
       : plan.status === 'listo'
         ? `Listo a las ${fmtTime(plan.generated_at)} · ${plan.tokens} tokens · US$${Number(plan.cost_usd).toFixed(4)}`
         : plan.status === 'enviado'
