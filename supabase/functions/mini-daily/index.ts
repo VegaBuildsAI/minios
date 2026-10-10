@@ -28,7 +28,7 @@ const SYSTEM =
   'Recibís JSON del estado de hoy. Leyenda: d=día; n=negocio; y=[ventas ayer ₡, tiquetes]; s7=[ventas 7 días ₡, tiquetes]; tr=% vs 7 días previos; ' +
   'an=z de ayer vs mismo día de semana (|z|>1.5 es raro); ex=venta típica de este día ₡; tk=tiquete promedio ₡; pk=hora pico; ' +
   'r=[producto, stock, días para agotarse]; o=[proveedor, días hasta su visita (0=hoy), [[producto, cantidad sugerida]]]; ' +
-  'tp=[producto, ganancia 7 días ₡]; pr=pares que se compran juntos; pe=[tiquetes sin registrar, Bitácora por revisar]; fi=fiado ₡; sh=turno abierto 1/0. ' +
+  'tp=[producto, ganancia 7 días ₡]; pr=pares que se compran juntos; pe=[tiquetes sin registrar, Bitácora por revisar]; fi=fiado ₡; sh=turno abierto 1/0 (0 solo significa que aún no se abrió el turno, NO que la tienda esté cerrada). ' +
   'Para cada franja escribí [título ≤6 palabras, mensaje ≤28 palabras] con lo más útil en ese momento: ' +
   'mad (0–5 h, tranquilizar), tem (5–7 h, abrir), man (7–11:30, reponer y proveedor), med (11:30–13:30, ritmo de ventas), tar (13:30–18:30, pedidos), noc (18:30–24 h, cuadre y cierre). ' +
   'No saludes. Usá solo estos datos; para cifras del momento podés escribir {v} (ventas de hoy), {t} (tiquetes de hoy), {m} (% de la meta) y {e} (efectivo en gaveta). ' +

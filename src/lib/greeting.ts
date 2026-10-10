@@ -124,7 +124,7 @@ export function greetingFor(d: Date, name: string, seed = 0): Greeting {
   const lastDay = new Date(Date.UTC(p.year, p.month + 1, 0)).getUTCDate() === p.day
   const pool = [...specials(slot, p.dow, p.day, lastDay), ...LINES[slot]]
   const line = pool[(seed + p.day) % pool.length]
-  const fill = (s: string) => s.replace('{n}', name).replace('{dia}', WEEKDAY[p.dow]).replace('{hora}', fmtTime(d, { hour: 'numeric', minute: '2-digit' }))
+  const fill = (s: string) => s.replace('{n}', name).replace('{dia}', WEEKDAY[p.dow]).replace('{hora}', fmtTime(d, { hour: 'numeric', minute: '2-digit' })).replace('..', '.')
   return { slot, lead: fill(line.lead), highlight: fill(line.highlight), tail: line.tail ?? '', subtitle: fill(line.subtitle) }
 }
 
