@@ -20,13 +20,17 @@ export function ConoceApp() {
   return (
     <div className="mx-auto flex max-w-[1120px] flex-col gap-10">
       <header className="flex flex-col gap-[18px] rounded-3xl bg-ink p-[clamp(24px,4vw,44px)] text-paper">
-        <span className="self-start rounded-full bg-marigold px-3 py-1 text-[0.75rem] font-bold tracking-[0.06em] text-ink uppercase">
-          Conoce la app · {meta.version} · {meta.country}
-        </span>
         <h1 className="font-display-m max-w-[820px] text-[clamp(2rem,4.5vw,3.25rem)] leading-[1.05] font-bold text-white">
           MiniOS: todo el minisúper en el celular
         </h1>
         <p className="max-w-[720px] text-[1.125rem] leading-relaxed text-[#cfd4cf]">{meta.tagline}</p>
+        <aside aria-label="¿Qué es un ERP?" className="max-w-[760px] rounded-2xl border border-[#3a413c] bg-white/[0.06] px-4 py-3.5">
+          <div className="mb-1 text-[0.75rem] font-bold tracking-[0.06em] text-marigold uppercase">¿Qué es un ERP?</div>
+          <p className="text-[0.9375rem] leading-relaxed text-[#e4e8e4]">
+            <b className="text-white">{meta.erpDefinition.term}</b> = <i>{meta.erpDefinition.expansion}</i>, en español{' '}
+            <b className="text-white">{meta.erpDefinition.translation}</b>: {meta.erpDefinition.body}
+          </p>
+        </aside>
         <div className="mt-1.5 grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-3">
           {meta.stats.map((s) => (
             <div key={s.label} className="border-t-2 border-[#3a413c] pt-3">

@@ -8,7 +8,7 @@ Fecha: 2026-10-06 · Carpeta: `C:\Users\AXIO\Documents\MINI_OS\minios` · Propie
 Primero leer: `CLAUDE.md` global, `docs/DEPLOY.md` (§8 = IA), `docs/AI_CONTEXT.md`, y este archivo. Memoria del proyecto en `C:\Users\AXIO\.claude\projects\C--Users-AXIO-Documents-MINI-OS\memory\`.
 
 ## 1. Qué es
-Micro-ERP (PWA) para un minisúper en Costa Rica. Vite 8 + React 19 + TS 6 + Tailwind v4 + TanStack Query + supabase-js (PKCE) + vite-plugin-pwa. Backend **100 % Supabase** (Postgres + RLS, Auth, Storage, Edge Functions Deno). Frontend en **Cloudflare Pages** (Supabase sirve HTML como `text/plain`, por eso no se hostea ahí).
+Mini-ERP (PWA) para un minisúper en Costa Rica. Vite 8 + React 19 + TS 6 + Tailwind v4 + TanStack Query + supabase-js (PKCE) + vite-plugin-pwa. Backend **100 % Supabase** (Postgres + RLS, Auth, Storage, Edge Functions Deno). Frontend en **Cloudflare Pages** (Supabase sirve HTML como `text/plain`, por eso no se hostea ahí).
 
 ## 2. Producción actual
 - Supabase Cloud ref `TU-PROJECT-REF`; anon key en `.env.production` (no está en este archivo).

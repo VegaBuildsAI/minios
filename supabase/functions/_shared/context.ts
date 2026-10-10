@@ -2,7 +2,7 @@
 // Es el resumen COMPACTO (~250 tokens) que se inyecta en el prompt de sistema del asistente.
 // La versión larga, para humanos, vive en docs/AI_CONTEXT.md: si cambia una, actualizá la otra.
 export const APP_CONTEXT =
-  'CONTEXTO DE LA APP (MiniOS, micro-ERP del minisúper): ' +
+  'CONTEXTO DE LA APP (MiniOS, mini-ERP del minisúper): ' +
   'Caja = único lugar donde se registran ventas (descuenta inventario solo). ' +
   'Inventario = productos con costo, precio, cantidad y mínimo; "crítico" = cantidad <= mínimo. ' +
   'Proveedores = visitan ciertos días y se les hacen órdenes de compra (borrador -> recibida). ' +

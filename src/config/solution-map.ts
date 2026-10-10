@@ -90,6 +90,8 @@ export interface StackLayerDef {
 export interface SolutionMeta {
   name: string
   tagline: string
+  /** «¿Qué es un ERP?» para «Conoce la app»: término, expansión, traducción y explicación. */
+  erpDefinition: { term: string; expansion: string; translation: string; body: string }
   version: string
   country: string
   stats: { num: string; label: string }[]
@@ -98,7 +100,13 @@ export interface SolutionMeta {
 export const meta: SolutionMeta = {
   name: 'MiniOS',
   tagline:
-    'Micro-ERP para minisúper. Caja, inventario, proveedores, bitácora y reportes desde el celular, con una capa de IA que convierte lo informal —tiquetes y facturas en foto, notas de voz— en datos.',
+    'Mini-ERP para minisúper. Caja, inventario, proveedores, bitácora y reportes desde el celular, con una capa de IA que convierte lo informal —tiquetes y facturas en foto, notas de voz— en datos.',
+  erpDefinition: {
+    term: 'ERP',
+    expansion: 'Enterprise Resource Planning',
+    translation: 'Planificación de Recursos Empresariales',
+    body: 'un solo sistema que conecta las áreas del negocio —ventas, inventario, compras, caja y reportes— para que todos trabajen con los mismos datos. MiniOS es la versión mini, hecha a la medida de un minisúper.',
+  },
   version: 'v0.1',
   country: 'Costa Rica',
   stats: [

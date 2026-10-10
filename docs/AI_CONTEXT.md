@@ -5,7 +5,7 @@ Documento de referencia para humanos. La versión **compacta** que viaja al mode
 sistema de `ai-assistant`). **Si cambia uno, actualizá el otro.**
 
 ## 1. Para qué usamos la IA
-MiniOS es el micro-ERP de un minisúper en Costa Rica (moneda ₡ CRC, IVA 13 %). La IA **no es un chatbot genérico**: hace dos trabajos.
+MiniOS es el mini-ERP de un minisúper en Costa Rica (moneda ₡ CRC, IVA 13 %). La IA **no es un chatbot genérico**: hace dos trabajos.
 
 1. **Leer documentos** (`ai-capture-parse`): fotos/PDF de facturas de proveedor, cierres de caja, recibos y notas manuscritas subidos a la Bitácora → clasifica (inventario / caja / notas), transcribe y extrae datos estructurados en **una sola llamada**.
 2. **Ayudar a entender y decidir** (`ai-assistant`): responde sobre inventario, ventas, proveedores y documentos usando herramientas de lectura, y **propone** acciones.

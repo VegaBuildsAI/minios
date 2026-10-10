@@ -43,7 +43,7 @@ export function Login() {
           <h1 className="font-display-m text-[1.75rem] font-bold text-ink">
             Mini<span className="text-brand">OS</span>
           </h1>
-          <p className="mt-1 text-[0.9375rem] text-ink-2">Micro-ERP para minisúper</p>
+          <p className="mt-1 text-[0.9375rem] text-ink-2">Mini-ERP para minisúper</p>
         </div>
 
         {sent ? (

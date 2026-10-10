@@ -19,7 +19,7 @@ export default defineConfig(({ mode }) => {
         registerType: 'autoUpdate',
         includeAssets: ['favicon.svg', 'icon.svg', 'apple-touch-icon.png'],
         manifest: {
-          name: 'MiniOS — Micro-ERP para Minisúper',
+          name: 'MiniOS — Mini-ERP para Minisúper',
           short_name: 'MiniOS',
           description: 'Caja, inventario, proveedores, bitácora y reportes desde el celular.',
           lang: 'es-CR',
