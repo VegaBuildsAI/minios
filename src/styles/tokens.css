@@ -201,9 +201,9 @@ html {
 
 body {
   margin: 0;
-  font-family: var(--font-sans-raw);
-  background: var(--bg-deep);
-  color: var(--text-primary);
+  font-family: var(--m-font-body);
+  background: var(--m-paper);
+  color: var(--m-ink);
   line-height: 1.6;
 }
 

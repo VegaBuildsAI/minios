@@ -167,8 +167,6 @@ export interface CashMovement {
   created_at: string
 }
 
-export const IVA_RATE = 0.13
-
 export function formatCRC(n: number): string {
   return '₡' + Math.round(n).toLocaleString('es-CR')
 }

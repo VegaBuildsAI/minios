@@ -306,5 +306,3 @@ export const stack: StackLayerDef[] = [
   { layer: 'Hosting', tech: 'Cloudflare Pages', note: 'Frontend estático; Supabase sirve los datos' },
 ]
 
-export const solutionMap = { meta, modules, roles, flows, reports, dbTables, stack }
-export type SolutionMap = typeof solutionMap

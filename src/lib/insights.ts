@@ -7,7 +7,6 @@ export type Severity = 'critico' | 'aviso' | 'ok'
 export interface Insight {
   id: string
   severity: Severity
-  icon: string
   title: string
   detail: string
   productId?: string
@@ -28,7 +27,6 @@ export function buildInsights(products: Product[], suppliers: Supplier[]): Insig
       out.push({
         id: `out-${p.id}`,
         severity: 'critico',
-        icon: '🚨',
         title: `${p.name} agotado`,
         detail: `Sin stock. Pedí a ${supName(p.supplier_id)}.`,
         productId: p.id,
@@ -38,7 +36,6 @@ export function buildInsights(products: Product[], suppliers: Supplier[]): Insig
       out.push({
         id: `low-${p.id}`,
         severity: 'aviso',
-        icon: '⚠️',
         title: `${p.name} bajo mínimo`,
         detail: `Quedan ${p.stock_qty} (mín ${p.min_qty}). Conviene pedir a ${supName(p.supplier_id)}.`,
         productId: p.id,
@@ -49,7 +46,6 @@ export function buildInsights(products: Product[], suppliers: Supplier[]): Insig
       out.push({
         id: `neg-${p.id}`,
         severity: 'critico',
-        icon: '📉',
         title: `${p.name} se vende bajo costo`,
         detail: `Precio ${formatCRC(p.sale_price)} < costo ${formatCRC(p.cost_price)}. Ajustá el precio.`,
         productId: p.id,
@@ -62,7 +58,7 @@ export function buildInsights(products: Product[], suppliers: Supplier[]): Insig
   out.sort((a, b) => rank[a.severity] - rank[b.severity])
 
   if (out.length === 0) {
-    out.push({ id: 'ok', severity: 'ok', icon: '✅', title: 'Todo en orden', detail: 'Sin alertas de inventario ni de margen.' })
+    out.push({ id: 'ok', severity: 'ok', title: 'Todo en orden', detail: 'Sin alertas de inventario ni de margen.' })
   }
   return out
 }

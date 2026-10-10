@@ -132,38 +132,3 @@ export function Switch({ checked, onChange, label }: { checked: boolean; onChang
     </button>
   )
 }
-
-/** Anillo de progreso (se conserva por compatibilidad; Inicio usa ProgressBar). */
-export function Ring({ pct, size = 60, label }: { pct: number; size?: number; label?: string }) {
-  const stroke = 7
-  const r = (size - stroke) / 2
-  const c = 2 * Math.PI * r
-  const dash = (pct / 100) * c
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0" role="img" aria-label={label ?? `${pct}%`}>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--m-paper-2)" strokeWidth={stroke} />
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={r}
-        fill="none"
-        stroke="var(--m-brand)"
-        strokeWidth={stroke}
-        strokeLinecap="round"
-        strokeDasharray={`${dash} ${c}`}
-        transform={`rotate(-90 ${size / 2} ${size / 2})`}
-      />
-      <text x="50%" y="50%" dominantBaseline="central" textAnchor="middle" className="fill-ink font-bold" style={{ fontSize: size * 0.24 }}>
-        {label ?? `${pct}%`}
-      </text>
-    </svg>
-  )
-}
-
-/**
- * @deprecated La barra de estado falsa del mockup se eliminó en el rediseño
- * (el sistema ya muestra la real). Se deja como no-op para no romper imports.
- */
-export function PhoneStatusBar() {
-  return null
-}

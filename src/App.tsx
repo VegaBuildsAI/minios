@@ -1,8 +1,7 @@
+import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell'
 import { ModulePlaceholder } from '@/components/ModulePlaceholder'
-import { ControlPanel } from '@/modules/control/ControlPanel'
-import { ConoceApp } from '@/modules/control/ConoceApp'
 import { MobileApp } from '@/modules/app/MobileApp'
 import { Home } from '@/modules/app/screens/Home'
 import { Assistant } from '@/modules/app/screens/Assistant'
@@ -18,6 +17,10 @@ import { Config } from '@/modules/app/screens/Config'
 import { Login } from '@/modules/auth/Login'
 import { RequireAuth } from '@/modules/auth/RequireAuth'
 import { RequireOwner } from '@/modules/auth/RequireOwner'
+
+// Área admin (escritorio): se descarga solo al entrar, la app móvil no la carga.
+const ControlPanel = lazy(() => import('@/modules/control/ControlPanel').then((m) => ({ default: m.ControlPanel })))
+const ConoceApp = lazy(() => import('@/modules/control/ConoceApp').then((m) => ({ default: m.ConoceApp })))
 
 export default function App() {
   return (
@@ -45,8 +48,22 @@ export default function App() {
         {/* Panel de Control + módulos (área admin: dueño y superadmin) */}
         <Route element={<RequireOwner />}>
           <Route element={<AppShell />}>
-            <Route path="/control" element={<ControlPanel />} />
-            <Route path="/control/conoce" element={<ConoceApp />} />
+            <Route
+              path="/control"
+              element={
+                <Suspense fallback={null}>
+                  <ControlPanel />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/control/conoce"
+              element={
+                <Suspense fallback={null}>
+                  <ConoceApp />
+                </Suspense>
+              }
+            />
             <Route path="/pos" element={<ModulePlaceholder code="pos" />} />
             <Route path="/inventory" element={<ModulePlaceholder code="inventory" />} />
             <Route path="/suppliers" element={<ModulePlaceholder code="suppliers" />} />
