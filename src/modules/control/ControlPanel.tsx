@@ -15,6 +15,7 @@ import { ProveedoresCard } from './dashboard/ProveedoresCard'
 import { TopProducts } from './dashboard/TopProducts'
 import { monoLabel, timeOf } from './dashboard/format'
 import { PERIODS, lastDays, rangeOf, type Period } from './dashboard/period'
+import { fmtDate } from '@/lib/time'
 
 /** Tablero operativo: lo que importa hoy de cada módulo, con datos reales de Supabase. */
 export function ControlPanel() {
@@ -43,7 +44,7 @@ export function ControlPanel() {
   const low = products.filter((p) => p.stock_qty > 0 && p.stock_qty <= p.min_qty).length
   const online = supabaseReady && !report.isError && !statsErr
   const updated = report.dataUpdatedAt ? timeOf(new Date(report.dataUpdatedAt).toISOString()) : '—'
-  const dateLabel = new Date().toLocaleDateString('es-CR', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\./g, '')
+  const dateLabel = fmtDate(new Date(), { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\./g, '')
 
   return (
     <div

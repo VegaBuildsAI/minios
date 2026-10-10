@@ -33,6 +33,7 @@ import { formatCRC, type CashKind, type PaymentMethod } from '@/lib/types'
 import { Card, Eyebrow } from '../components'
 import { TICKET_MARK, usePendingTickets } from '@/lib/tickets'
 import { TicketSheet } from '../widgets/TicketSheet'
+import { fmtTime } from '@/lib/time'
 
 const PAY_LABEL: Record<PaymentMethod, string> = { efectivo: 'Efectivo', sinpe: 'SINPE', tarjeta: 'Tarjeta', fiado: 'Fiado' }
 
@@ -43,7 +44,7 @@ const KIND: Record<CashKind, { label: string; icon: LucideIcon; out: boolean; hi
   ingreso: { label: 'Entrada de efectivo', icon: Wallet, out: false, hint: 'Ej. fondo para cambio' },
 }
 
-const time = (iso: string) => new Date(iso).toLocaleTimeString('es-CR', { hour: '2-digit', minute: '2-digit' })
+const time = (iso: string) => fmtTime(iso)
 
 export function Caja() {
   const navigate = useNavigate()

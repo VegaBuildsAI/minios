@@ -1,6 +1,6 @@
 import type { Supplier } from './types'
 
-/** Días tal como se guardan en `suppliers.visit_days` (sin tildes), indexados por `Date.getDay()`. */
+/** Días tal como se guardan en `suppliers.visit_days` (sin tildes), indexados por día de la semana (0 = domingo, hora de Costa Rica). */
 export const DAYS = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado']
 export const DAY_SHORT = ['D', 'L', 'M', 'K', 'J', 'V', 'S']
 export const DAY_LABEL: Record<string, string> = {

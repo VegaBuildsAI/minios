@@ -4,17 +4,15 @@ import { Card, Chip, ScreenHeader, Segmented } from '../components'
 import { useSalesReport } from '@/lib/data'
 import { downloadCSV } from '@/lib/csv'
 import { formatCRC } from '@/lib/types'
+import { crParts, crStartOfDay } from '@/lib/time'
 
 type Period = 'hoy' | '7d' | '30d' | 'mes'
 
 function range(p: Period): { from: string; to: string } {
+  // Días calendario de Costa Rica
   const to = new Date()
-  const from = new Date()
-  from.setHours(0, 0, 0, 0)
-  if (p === '7d') from.setDate(from.getDate() - 6)
-  else if (p === '30d') from.setDate(from.getDate() - 29)
-  else if (p === 'mes') from.setDate(1)
-  return { from: from.toISOString(), to: to.toISOString() }
+  const back = p === '7d' ? 6 : p === '30d' ? 29 : p === 'mes' ? crParts(to).day - 1 : 0
+  return { from: crStartOfDay(to, -back).toISOString(), to: to.toISOString() }
 }
 
 const LABELS: Record<Period, string> = { hoy: 'Hoy', '7d': '7 días', '30d': '30 días', mes: 'Mes' }

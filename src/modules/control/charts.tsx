@@ -1,6 +1,7 @@
 import { useId, useState } from 'react'
 import type { TrendPoint } from '@/lib/data'
 import { formatCRC } from '@/lib/types'
+import { crNoonOf, fmtDate } from '@/lib/time'
 
 export const C_VENTAS = '#12845F'
 export const C_GANANCIA = '#C98314'
@@ -76,8 +77,8 @@ export function TrendGlass({ points }: { points: TrendPoint[] }) {
   const cur = points[idx]
   const xPct = n <= 1 ? 50 : (idx / (n - 1)) * 100
   const isToday = idx === n - 1
-  const d = new Date(`${cur.key}T12:00:00`)
-  const head = `${isToday ? 'HOY · ' : ''}${d.toLocaleDateString('es-CR', { weekday: 'short', day: 'numeric' }).toUpperCase()}`
+  const d = crNoonOf(cur.key)
+  const head = `${isToday ? 'HOY · ' : ''}${fmtDate(d, { weekday: 'short', day: 'numeric' }).toUpperCase()}`
   const total = points.reduce((a, p) => a + p.ventas, 0)
   const lo = Math.min(...points.map((p) => p.ventas))
   const hi = Math.max(...points.map((p) => p.ventas))

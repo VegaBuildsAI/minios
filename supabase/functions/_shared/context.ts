@@ -3,7 +3,7 @@
 // La versión larga, para humanos, vive en docs/AI_CONTEXT.md: si cambia una, actualizá la otra.
 export const APP_CONTEXT =
   'CONTEXTO DE LA APP (MiniOS, mini-ERP del minisúper): ' +
-  'Caja = único lugar donde se registran ventas (descuenta inventario solo). ' +
+  'Caja = las ventas se cobran en la caja registradora; en MiniOS se registra cada tiquete (foto leída por IA, cada línea enrutada a un producto: descuenta inventario) y las entradas/salidas de efectivo (gastos, pagos a proveedor, retiros) del turno. ' +
   'Inventario = productos con costo, precio, cantidad y mínimo; "crítico" = cantidad <= mínimo. ' +
   'Proveedores = visitan ciertos días y se les hacen órdenes de compra (borrador -> recibida). ' +
   'Bitácora = notas, voz y archivos (facturas, cierres de caja, recibos) que se leen con IA; categorías: inventario (facturas de proveedor), caja (cierres, recibos), notas. ' +

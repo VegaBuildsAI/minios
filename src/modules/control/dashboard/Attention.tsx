@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useCaptureStats, useProducts, useSuppliers } from '@/lib/data'
 import { usePendingTickets } from '@/lib/tickets'
 import { DAYS, visitsOn } from '@/lib/visits'
+import { crParts } from '@/lib/time'
 
 interface Item {
   key: string
@@ -29,7 +30,7 @@ export function Attention() {
 
   const out = products.filter((p) => p.stock_qty <= 0)
   const review = caps?.byStatus.borrador ?? 0
-  const visiting = suppliers.filter((s) => visitsOn(s, DAYS[new Date().getDay()]))
+  const visiting = suppliers.filter((s) => visitsOn(s, DAYS[crParts().dow]))
 
   const items: Item[] = []
   if (out.length)

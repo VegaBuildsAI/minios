@@ -5,6 +5,7 @@ import { TrendChart } from '@/components/TrendChart'
 import { useProducts, useSalesReport, useSuppliers, type TrendGranularity } from '@/lib/data'
 import { profitSuggestion } from '@/lib/suggestions'
 import { formatCRC } from '@/lib/types'
+import { crStartOfDay } from '@/lib/time'
 
 type Period = 'dia' | 'semana' | 'mes'
 
@@ -15,11 +16,9 @@ const PERIODS: Record<Period, { label: string; caption: string; days: number; gr
 }
 
 function range(days: number): { from: string; to: string } {
+  // Días calendario de Costa Rica
   const to = new Date()
-  const from = new Date()
-  from.setHours(0, 0, 0, 0)
-  from.setDate(from.getDate() - (days - 1))
-  return { from: from.toISOString(), to: to.toISOString() }
+  return { from: crStartOfDay(to, -(days - 1)).toISOString(), to: to.toISOString() }
 }
 
 export function Ventas() {

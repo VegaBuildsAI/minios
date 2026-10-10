@@ -71,12 +71,14 @@ export function MiniBot({
   reacting,
   onClick,
   label,
+  size = 128,
 }: {
   mood: Mood
   intro: boolean
   reacting: boolean
   onClick: () => void
   label: string
+  size?: number
 }) {
   const led = mood === 'worried' ? '#E8A33D' : mood === 'sleepy' ? '#7C8A83' : EYE
   return (
@@ -85,7 +87,8 @@ export function MiniBot({
       onClick={onClick}
       aria-label={label}
       data-mood={mood}
-      className={`minibot relative block h-[128px] w-[128px] touch-manipulation rounded-full ${intro ? 'minibot-enter' : 'minibot-fade'}`}
+      className={`minibot relative block touch-manipulation rounded-full ${intro ? 'minibot-enter' : 'minibot-fade'}`}
+      style={{ width: size, height: size }}
     >
       <svg viewBox="0 0 140 140" className="h-full w-full overflow-visible" aria-hidden="true">
         <defs>

@@ -5,6 +5,7 @@ import { useAdjustStock, useProducts, useStockMovements } from '@/lib/data'
 import { formatCRC, type MovementReason, type Product } from '@/lib/types'
 import { useAuth } from '@/modules/auth/context'
 import { ManualEntrySheet, NewProductSheet } from '../widgets/InventarioSheets'
+import { fmtDateTime } from '@/lib/time'
 
 function statusOf(st: number, min: number): { label: string; tone: 'teal' | 'amber' | 'rose' } {
   if (st <= 0) return { label: 'Agotado', tone: 'rose' }
@@ -201,7 +202,7 @@ function AdjustSheet({ product, onClose }: { product: Product; onClose: () => vo
               {movements.map((m) => (
                 <div key={m.id} className="flex items-center justify-between rounded-xl bg-paper px-3 py-2 text-[0.875rem]">
                   <span className="text-ink-2">{REASON_LABEL[m.reason] ?? m.reason}</span>
-                  <span className="text-ink-3">{new Date(m.created_at).toLocaleString('es-CR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                  <span className="text-ink-3">{fmtDateTime(m.created_at, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
                   <span className={`tabular-nums font-semibold ${m.delta < 0 ? 'text-danger' : 'text-brand'}`}>
                     {m.delta > 0 ? '+' : ''}
                     {m.delta}

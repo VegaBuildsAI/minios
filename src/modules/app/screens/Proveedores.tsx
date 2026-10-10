@@ -11,6 +11,7 @@ import {
 } from '@/lib/data'
 import { formatCRC, type POStatus, type Supplier } from '@/lib/types'
 import { DAYS, DAY_SHORT, visitsOn } from '@/lib/visits'
+import { crParts, crStartOfDay, fmtDate } from '@/lib/time'
 
 const PO_TONE: Record<POStatus, Tone> = { borrador: 'neutral', enviada: 'amber', recibida: 'brand', cancelada: 'rose' }
 const PO_LABEL: Record<POStatus, string> = { borrador: 'Borrador', enviada: 'Enviada', recibida: 'Recibida', cancelada: 'Cancelada' }
@@ -31,12 +32,10 @@ export function Proveedores() {
 
   // Próximos 7 días, empezando hoy
   const week = useMemo(() => {
-    const today = new Date()
     return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(today)
-      d.setDate(today.getDate() + i)
-      const day = DAYS[d.getDay()]
-      return { i, label: DAY_SHORT[d.getDay()], date: d.getDate(), who: suppliers.filter((s) => visitsOn(s, day)) }
+      const p = crParts(crStartOfDay(new Date(), i))
+      const day = DAYS[p.dow]
+      return { i, label: DAY_SHORT[p.dow], date: p.day, who: suppliers.filter((s) => visitsOn(s, day)) }
     })
   }, [suppliers])
   const [dayIdx, setDayIdx] = useState<number | null>(null)
@@ -131,7 +130,7 @@ export function Proveedores() {
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[0.9375rem] font-semibold text-ink">{nameOf(o.supplier_id)}</div>
                   <div className="tabular-nums text-[0.8125rem] text-ink-2">
-                    {new Date(o.created_at).toLocaleDateString('es-CR', { weekday: 'short', day: 'numeric', month: 'short' })}
+                    {fmtDate(o.created_at, { weekday: 'short', day: 'numeric', month: 'short' })}
                   </div>
                 </div>
                 <span className="tabular-nums text-[0.9375rem] font-bold text-ink">{formatCRC(o.total)}</span>
@@ -247,7 +246,7 @@ function POCard({
         <div className="flex-1">
           <div className="text-[0.875rem] font-semibold text-ink">Orden #{poId.slice(0, 4)}</div>
           <div className="text-[0.8125rem] text-ink-3">
-            {new Date(createdAt).toLocaleDateString('es-CR', { day: '2-digit', month: 'short' })} · {formatCRC(total)}
+            {fmtDate(createdAt, { day: '2-digit', month: 'short' })} · {formatCRC(total)}
           </div>
         </div>
         <Chip tone={received ? 'teal' : 'amber'}>{status}</Chip>

@@ -5,6 +5,7 @@ import { Card, Chip } from '../components'
 import { useProducts, useSuppliers } from '@/lib/data'
 import type { Supplier } from '@/lib/types'
 import { DAYS, DAY_LABEL, visitsOn } from '@/lib/visits'
+import { crParts } from '@/lib/time'
 
 /** Proveedores que visitan hoy; si hoy no viene nadie, los del próximo día con visita. */
 export function SupplierToday() {
@@ -12,7 +13,7 @@ export function SupplierToday() {
   const { data: products = [] } = useProducts()
 
   const { suppliersToShow, when, isToday } = useMemo(() => {
-    const dow = new Date().getDay()
+    const dow = crParts().dow
     const today = suppliers.filter((s) => visitsOn(s, DAYS[dow]))
     if (today.length > 0) return { suppliersToShow: today, when: 'Hoy', isToday: true }
     for (let offset = 1; offset <= 7; offset++) {

@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { localDayKey, useCaptureStats, useDashboardStats, useSuppliers } from './data'
+import { useQuery } from '@tanstack/react-query'
+import { fetchBriefing, localDayKey, useBusinessSettings, useCaptureStats, useDashboardStats, useSuppliers, type Briefing } from './data'
 import { useInsights } from './insights'
 import { usePendingTickets } from './tickets'
 import { formatCRC } from './types'
 import { DAYS, visitsOn } from './visits'
 import type { DaySlot } from './greeting'
+import { crParts } from './time'
 
 /** Ánimo del robot: cambia con los datos y con lo que hace el usuario. */
 export type Mood = 'happy' | 'excited' | 'worried' | 'sleepy' | 'thinking' | 'wink'
@@ -105,7 +107,7 @@ export function useCompanion(goal: number, slot: DaySlot) {
         mood: 'thinking',
       })
     }
-    const visiting = suppliers.filter((s) => visitsOn(s, DAYS[new Date().getDay()]))
+    const visiting = suppliers.filter((s) => visitsOn(s, DAYS[crParts().dow]))
     if (visiting.length) {
       out.push({
         id: 'supplier',
@@ -149,4 +151,58 @@ export function useCompanion(goal: number, slot: DaySlot) {
   }, [insights, pending.length, stats, last, goal, slot, caps, suppliers])
 
   return { messages, loading: isLoading || !stats }
+}
+
+const BRIEF_KEY = 'minios-briefing'
+const BRIEF_TTL = 45 * 60_000
+
+interface CachedBriefing {
+  fp: string
+  at: number
+  data: Briefing
+}
+
+function readBrief(fp: string): CachedBriefing | undefined {
+  try {
+    const c = JSON.parse(localStorage.getItem(BRIEF_KEY) ?? 'null') as CachedBriefing | null
+    return c && c.fp === fp && Date.now() - c.at < BRIEF_TTL ? c : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Mensaje de «Mini» redactado por la IA con el estado real del negocio. Solo se vuelve a
+ * pedir cuando algo cambia (huella: día, franja, ventas, críticos, pendientes) o pasados
+ * 45 min; mientras tanto se reutiliza el último (también entre aperturas de la app).
+ * Si la IA está apagada o falla, el Inicio usa los avisos locales.
+ */
+export function useBriefing(goal: number, slot: DaySlot) {
+  const { data: stats } = useDashboardStats()
+  const { data: settings } = useBusinessSettings()
+  const { data: caps } = useCaptureStats()
+  const pending = usePendingTickets()
+  const fp = stats
+    ? [localDayKey(new Date()), slot, stats.salesTodayCount, stats.criticalCount, pending.length, caps?.byStatus.borrador ?? 0].join('|')
+    : ''
+  const cached = fp ? readBrief(fp) : undefined
+  const q = useQuery({
+    queryKey: ['briefing', fp],
+    enabled: !!fp && settings?.ai_enabled !== false,
+    staleTime: BRIEF_TTL,
+    retry: false,
+    refetchOnWindowFocus: false,
+    initialData: cached?.data,
+    initialDataUpdatedAt: cached?.at,
+    queryFn: async (): Promise<Briefing> => {
+      const b = await fetchBriefing(goal)
+      try {
+        localStorage.setItem(BRIEF_KEY, JSON.stringify({ fp, at: Date.now(), data: b }))
+      } catch {
+        /* sin caché persistente */
+      }
+      return b
+    },
+  })
+  return { briefing: q.data, loading: q.isFetching, error: q.isError, at: q.dataUpdatedAt, aiOff: settings?.ai_enabled === false }
 }

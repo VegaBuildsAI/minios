@@ -1,11 +1,11 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase'
 import { type CaptureCategory, type CaptureStatus, type CaptureType, type CashKind, type CashMovement, type Category, type MovementReason, type PaymentMethod, type Product, type PurchaseItem, type PurchaseOrder, type Sale, type Shift, type StockMovement, type Supplier, type Capture, type Proposal } from './types'
+import { crDayKey, crParts, crStartOfDay, DAY_MS } from './time'
 
+/** 00:00 de hoy en Costa Rica (no en la zona del dispositivo). */
 function startOfToday(): string {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  return d.toISOString()
+  return crStartOfDay().toISOString()
 }
 
 // ---------- Queries ----------
@@ -686,8 +686,7 @@ export async function uploadBitacoraFile(original: File): Promise<UploadedFile> 
     throw new Error(`"${original.name}" pesa ${(file.size / 1048576).toFixed(1)} MB; el máximo es 10 MB.`)
   }
   const ext = file.type === 'application/pdf' ? 'pdf' : file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg'
-  const now = new Date()
-  const folder = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const folder = crDayKey().slice(0, 7)
   const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
   const { error } = await supabase.storage.from('bitacora').upload(path, file, { contentType: file.type, upsert: false })
   if (error) throw error
@@ -837,10 +836,12 @@ export type TrendGranularity = 'hour' | 'day'
 export interface TrendPoint { key: string; label: string; ventas: number; ganancia: number; tickets: number }
 
 const pad2 = (n: number) => String(n).padStart(2, '0')
-/** Clave de día en HORA LOCAL (evita que las ventas de la tarde-noche en UTC−6 caigan al día siguiente). */
+/** Clave de día en hora de Costa Rica (las ventas de la noche no caen al día siguiente UTC). */
 export function localDayKey(d: Date): string {
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+  return crDayKey(d)
 }
+/** Clave de bucket: día, o día + hora (Costa Rica). */
+const bucketKey = (d: Date, gran: TrendGranularity) => (gran === 'hour' ? `${crDayKey(d)} ${pad2(crParts(d).hour)}` : crDayKey(d))
 
 /** Buckets rellenos en cero para ver el período completo (incluidos los huecos sin ventas). */
 function emptyTrend(fromISO: string, toISO: string, gran: TrendGranularity): TrendPoint[] {
@@ -851,10 +852,10 @@ function emptyTrend(fromISO: string, toISO: string, gran: TrendGranularity): Tre
     const base = localDayKey(start)
     for (let h = 0; h < 24; h++) out.push({ key: `${base} ${pad2(h)}`, label: `${h}h`, ventas: 0, ganancia: 0, tickets: 0 })
   } else {
-    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate())
-    while (d <= end) {
-      out.push({ key: localDayKey(d), label: pad2(d.getDate()), ventas: 0, ganancia: 0, tickets: 0 })
-      d.setDate(d.getDate() + 1)
+    // Costa Rica no tiene horario de verano: cada día dura exactamente 24 h.
+    for (let t = crStartOfDay(start).getTime(); t <= end.getTime(); t += DAY_MS) {
+      const d = new Date(t)
+      out.push({ key: crDayKey(d), label: pad2(crParts(d).day), ventas: 0, ganancia: 0, tickets: 0 })
     }
   }
   return out
@@ -913,8 +914,7 @@ export function useSalesReport(fromISO: string, toISO: string, granularity: Tren
         cost += c
         const pid = it.products?.id ?? it.products?.name ?? '—'
         if (it.sales?.created_at) {
-          const dt = new Date(it.sales.created_at)
-          const key = granularity === 'hour' ? `${localDayKey(dt)} ${pad2(dt.getHours())}` : localDayKey(dt)
+          const key = bucketKey(new Date(it.sales.created_at), granularity)
           const bucket = trendIndex.get(key)
           if (bucket) {
             bucket.ventas += rev
@@ -937,8 +937,7 @@ export function useSalesReport(fromISO: string, toISO: string, granularity: Tren
         const day = localDayKey(new Date(s.created_at))
         byDayMap[day] = (byDayMap[day] ?? 0) + Number(s.total)
         byMethod[s.payment_method] = (byMethod[s.payment_method] ?? 0) + Number(s.total)
-        const dt = new Date(s.created_at)
-        const bucket = trendIndex.get(granularity === 'hour' ? `${localDayKey(dt)} ${pad2(dt.getHours())}` : localDayKey(dt))
+        const bucket = trendIndex.get(bucketKey(new Date(s.created_at), granularity))
         if (bucket) bucket.tickets++
       }
 
@@ -1064,6 +1063,22 @@ export interface AssistantReply {
   reply: string
   proposals: Proposal[]
   tokens: number
+}
+
+export type BriefingScreen = 'caja' | 'inventario' | 'proveedores' | 'bitacora' | 'ventas' | 'reportes' | 'asistente' | 'alerta'
+
+/** Lo que «Mini» le dice al usuario al abrir el Inicio, redactado por la IA con datos reales. */
+export interface Briefing {
+  mood: 'happy' | 'excited' | 'worried' | 'thinking' | 'sleepy'
+  titulo: string
+  mensaje: string
+  ir_a: BriefingScreen
+  sugerencias: string[]
+}
+
+/** Pide a la IA el mensaje del Inicio (lee el estado del negocio en el servidor). */
+export function fetchBriefing(goal: number) {
+  return invokeFn<Briefing & { tokens: number }>('ai-assistant', { mode: 'briefing', goal })
 }
 
 /** Pregunta al asistente. El cliente envía solo los últimos turnos de texto (menos tokens). */

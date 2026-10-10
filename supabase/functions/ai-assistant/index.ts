@@ -28,6 +28,7 @@ import {
   type Usage,
 } from '../_shared/ai.ts'
 import { APP_CONTEXT } from '../_shared/context.ts'
+import { briefing } from './briefing.ts'
 
 const MODEL = Deno.env.get('AI_MODEL_ASSISTANT') ?? 'claude-haiku-4-5'
 const KEEP_MESSAGES = 8
@@ -38,7 +39,7 @@ const RAZONES = ['entrada', 'merma', 'robo', 'vencimiento', 'ajuste']
 const obj = (properties: Record<string, unknown>, required: string[] = []) => ({ type: 'object', properties, required })
 
 const TOOLS = [
-  { name: 'estado_negocio', description: 'Resumen de hoy: ventas, ganancia, inventario crítico, fíado y borradores de bitácora.', input_schema: obj({}) },
+  { name: 'estado_negocio', description: 'Resumen de hoy: ventas, ganancia, inventario crítico, fíado, borradores de bitácora, turno de caja y efectivo esperado en gaveta (apertura + tiquetes en efectivo + entradas − salidas del turno).', input_schema: obj({}) },
   {
     name: 'buscar_productos',
     description: 'Busca productos por nombre (parcial) o lista los de inventario crítico. Devuelve inventario, mínimo, precios y proveedor.',
@@ -115,6 +116,13 @@ Deno.serve(
     const { user, db, admin } = await requireUser(req)
     const body = await req.json().catch(() => ({}))
 
+    // «Mini» en el Inicio: lee el estado real y lo cuenta en una sola llamada.
+    if (body?.mode === 'briefing') {
+      await guard(admin, user.id, 'assistant')
+      const goal = Math.min(Math.max(Number(body?.goal) || 0, 0), 100_000_000)
+      return json(await briefing(db, admin, user.id, goal))
+    }
+
     // Historial: solo texto, últimos turnos, empezando y terminando en 'user'.
     const history = (Array.isArray(body?.messages) ? body.messages : [])
       // deno-lint-ignore no-explicit-any
@@ -170,16 +178,31 @@ Deno.serve(
       switch (name) {
         case 'estado_negocio': {
           const start = crDayStartISO()
-          const [sales, prods, debt, drafts] = await Promise.all([
+          const [sales, prods, debt, drafts, shiftRes] = await Promise.all([
             db.rpc('ai_sales_summary', { p_from: start, p_to: new Date().toISOString() }),
             products(),
             db.from('customers').select('balance_debt'),
             db.from('captures').select('id', { count: 'exact', head: true }).eq('status', 'borrador'),
+            db.from('shifts').select('id,opened_at,opening_cash').is('closed_at', null).order('opened_at', { ascending: false }).limit(1).maybeSingle(),
           ])
+          const sh = shiftRes.data as { id: string; opened_at: string; opening_cash: number } | null
+          let caja = 'caja: no hay turno abierto'
+          if (sh) {
+            const [ss, cm] = await Promise.all([
+              db.from('sales').select('total').eq('shift_id', sh.id).eq('payment_method', 'efectivo'),
+              db.from('cash_movements').select('kind,amount').eq('shift_id', sh.id),
+            ])
+            const tiq = ((ss.data ?? []) as { total: number }[]).reduce((a, r) => a + Number(r.total), 0)
+            const movs = (cm.data ?? []) as { kind: string; amount: number }[]
+            const ins = movs.filter((m) => m.kind === 'ingreso').reduce((a, m) => a + Number(m.amount), 0)
+            const outs = movs.filter((m) => m.kind !== 'ingreso').reduce((a, m) => a + Number(m.amount), 0)
+            const desde = new Date(new Date(sh.opened_at).getTime() - 6 * 3_600_000).toISOString().slice(0, 16).replace('T', ' ')
+            caja = `turno abierto desde ${desde}: apertura ${crc(sh.opening_cash)} + tiquetes en efectivo ${crc(tiq)} + entradas ${crc(ins)} − salidas ${crc(outs)} = efectivo esperado en gaveta ${crc(Number(sh.opening_cash) + tiq + ins - outs)}`
+          }
           const s = (sales.data ?? {}) as { ventas?: number; ganancia?: number; tickets?: number }
           const crit = prods.filter((p) => Number(p.stock_qty) <= Number(p.min_qty)).length
           const fiado = ((debt.data ?? []) as { balance_debt: number }[]).reduce((a, r) => a + Number(r.balance_debt), 0)
-          return `ventas hoy ${crc(s.ventas ?? 0)} (${s.tickets ?? 0} tickets) | ganancia ${crc(s.ganancia ?? 0)} | inventario crítico: ${crit} productos | fíado por cobrar ${crc(fiado)} | borradores en bitácora: ${drafts.count ?? 0}`
+          return `ventas hoy ${crc(s.ventas ?? 0)} (${s.tickets ?? 0} tickets) | ganancia ${crc(s.ganancia ?? 0)} | inventario crítico: ${crit} productos | fíado por cobrar ${crc(fiado)} | borradores en bitácora: ${drafts.count ?? 0} | ${caja}`
         }
 
         case 'buscar_productos': {

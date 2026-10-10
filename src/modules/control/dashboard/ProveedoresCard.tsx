@@ -2,17 +2,17 @@ import { useProducts, usePurchaseOrders, useSuppliers } from '@/lib/data'
 import { formatCRC } from '@/lib/types'
 import { DAYS, DAY_SHORT, visitsOn } from '@/lib/visits'
 import { ModuleCard } from './ui'
+import { crParts, crStartOfDay } from '@/lib/time'
 
 export function ProveedoresCard() {
   const { data: suppliers = [] } = useSuppliers()
   const { data: products = [] } = useProducts()
   const { data: orders = [] } = usePurchaseOrders()
 
-  const now = new Date()
   const week = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i)
-    const day = DAYS[d.getDay()]
-    return { key: i, short: DAY_SHORT[d.getDay()], n: d.getDate(), visits: suppliers.filter((s) => visitsOn(s, day)), today: i === 0 }
+    const p = crParts(crStartOfDay(new Date(), i))
+    const day = DAYS[p.dow]
+    return { key: i, short: DAY_SHORT[p.dow], n: p.day, visits: suppliers.filter((s) => visitsOn(s, day)), today: i === 0 }
   })
   const today = week[0].visits
   const lowOf = (id: string) => products.filter((p) => p.supplier_id === id && p.stock_qty <= p.min_qty).length

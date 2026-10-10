@@ -15,7 +15,8 @@ Regla de oro: **la IA propone, el usuario confirma**. Nunca escribe datos por s�
 ## 2. Mapa de la app (dónde vive cada cosa)
 | Módulo | Qué hace | Datos |
 |---|---|---|
-| Caja | **Único** lugar donde se registran ventas; descuenta inventario por trigger | `sales`, `sale_items`, `shifts` |
+| Caja | Las ventas se cobran en la registradora; se registra cada **tiquete** (foto → IA → líneas enrutadas a productos, descuenta inventario) y las **entradas/salidas de efectivo** del turno | `sales`, `sale_items`, `shifts`, `cash_movements` |
+| Inicio («Mini») | Agente del Inicio: `ai-assistant` con `mode: 'briefing'` lee el estado real (hora de Costa Rica) y lo cuenta; se le puede preguntar ahí mismo | — |
 | Inventario | Productos con costo, precio, cantidad y mínimo. "Crítico" = cantidad ≤ mínimo | `products`, `stock_movements` |
 | Proveedores | Visitan ciertos días; órdenes borrador → recibida | `suppliers`, `purchase_orders`, `purchase_items` |
 | Bitácora | Texto, voz y archivos; categorías inventario / caja / notas; lectura con IA | `captures` (+ `extracted_text`, `parsed_json.ai`) |

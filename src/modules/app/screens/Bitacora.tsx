@@ -15,6 +15,7 @@ import {
 import { useAuth } from '@/modules/auth/context'
 import { AiDocPanel } from '../widgets/AiDocPanel'
 import type { Capture, CaptureCategory, CaptureType } from '@/lib/types'
+import { fmtDateTime } from '@/lib/time'
 
 type Tab = 'text' | 'voice' | 'file'
 
@@ -296,7 +297,7 @@ export function Bitacora() {
                     <M.icon size={16} aria-hidden="true" />
                   </span>
                   <span className="text-[0.8125rem] text-ink-3">
-                    {new Date(c.created_at).toLocaleString('es-CR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    {fmtDateTime(c.created_at, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                   </span>
                   <span className={`rounded-full px-2 py-0.5 text-[0.8125rem] font-semibold ${CATEGORY_CLS[c.category] ?? CATEGORY_CLS.notas}`}>
                     {CATEGORY_LABEL[c.category] ?? 'Notas'}
