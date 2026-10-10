@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell'
 import { ModulePlaceholder } from '@/components/ModulePlaceholder'
 import { ControlPanel } from '@/modules/control/ControlPanel'
+import { ConoceApp } from '@/modules/control/ConoceApp'
 import { MobileApp } from '@/modules/app/MobileApp'
 import { Home } from '@/modules/app/screens/Home'
 import { Assistant } from '@/modules/app/screens/Assistant'
@@ -16,6 +17,7 @@ import { Reportes } from '@/modules/app/screens/Reportes'
 import { Config } from '@/modules/app/screens/Config'
 import { Login } from '@/modules/auth/Login'
 import { RequireAuth } from '@/modules/auth/RequireAuth'
+import { RequireOwner } from '@/modules/auth/RequireOwner'
 
 export default function App() {
   return (
@@ -40,15 +42,18 @@ export default function App() {
         <Route path="/app/assistant" element={<Assistant />} />
         <Route path="/app/caja" element={<Caja />} />
 
-        {/* Panel de Control + módulos (vista admin, escritorio/tablet) */}
-        <Route element={<AppShell />}>
-          <Route path="/control" element={<ControlPanel />} />
-          <Route path="/pos" element={<ModulePlaceholder code="pos" />} />
-          <Route path="/inventory" element={<ModulePlaceholder code="inventory" />} />
-          <Route path="/suppliers" element={<ModulePlaceholder code="suppliers" />} />
-          <Route path="/bitacora" element={<ModulePlaceholder code="bitacora" />} />
-          <Route path="/reports" element={<ModulePlaceholder code="reports" />} />
-          <Route path="/settings" element={<ModulePlaceholder code="settings" />} />
+        {/* Panel de Control + módulos (área admin: dueño y superadmin) */}
+        <Route element={<RequireOwner />}>
+          <Route element={<AppShell />}>
+            <Route path="/control" element={<ControlPanel />} />
+            <Route path="/control/conoce" element={<ConoceApp />} />
+            <Route path="/pos" element={<ModulePlaceholder code="pos" />} />
+            <Route path="/inventory" element={<ModulePlaceholder code="inventory" />} />
+            <Route path="/suppliers" element={<ModulePlaceholder code="suppliers" />} />
+            <Route path="/bitacora" element={<ModulePlaceholder code="bitacora" />} />
+            <Route path="/reports" element={<ModulePlaceholder code="reports" />} />
+            <Route path="/settings" element={<ModulePlaceholder code="settings" />} />
+          </Route>
         </Route>
       </Route>
 

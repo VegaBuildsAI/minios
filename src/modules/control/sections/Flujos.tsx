@@ -1,20 +1,37 @@
 import { flows } from '@/config/solution-map'
-import { SectionHeader } from '@/components/SectionHeader'
-import { FlowTrack } from '@/components/FlowTrack'
+import { Section } from './Section'
 
 export function Flujos() {
   return (
-    <section id="flujos" className="scroll-mt-20">
-      <SectionHeader
-        label="Flujos"
-        title="Cómo se mueve la operación"
-        desc="Los circuitos clave del negocio, del gesto informal al dato estructurado — con la IA cerrando cada lazo."
-      />
-      <div className="grid gap-4 lg:grid-cols-2">
+    <Section id="flujos" label="Flujos" title="Cómo se mueve un dato">
+      <div className="flex flex-col gap-3">
         {flows.map((f) => (
-          <FlowTrack key={f.id} flow={f} />
+          <div key={f.id} className="flex flex-col gap-3 rounded-[18px] border border-hair bg-white p-[18px]">
+            <div className="flex flex-wrap items-baseline justify-between gap-1.5">
+              <h3 className="text-[1.0625rem] font-bold text-ink">{f.name}</h3>
+              <span className="text-[0.875rem] text-ink-2">Se dispara: {f.trigger}</span>
+            </div>
+            <ol className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-2">
+              {f.steps.map((s, i) => {
+                const last = i === f.steps.length - 1
+                return (
+                  <li key={s.title} className="flex flex-col gap-0.5 rounded-xl bg-paper px-3 py-2.5">
+                    <span
+                      className={`tabular-nums mb-1 flex h-6 w-6 items-center justify-center rounded-full text-[0.75rem] font-bold ${
+                        last ? 'bg-brand text-white' : 'bg-white text-ink'
+                      }`}
+                    >
+                      {i + 1}
+                    </span>
+                    <span className="text-[0.875rem] font-bold text-ink">{s.title}</span>
+                    <span className="text-[0.8125rem] leading-snug text-ink-2">{s.desc}</span>
+                  </li>
+                )
+              })}
+            </ol>
+          </div>
         ))}
       </div>
-    </section>
+    </Section>
   )
 }

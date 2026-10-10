@@ -1,30 +1,18 @@
 import { stack } from '@/config/solution-map'
-import { accentVars } from '@/lib/accent'
-import { SectionHeader } from '@/components/SectionHeader'
+import { Section } from './Section'
 
 export function Stack() {
   return (
-    <section id="stack" className="scroll-mt-20">
-      <SectionHeader
-        label="Stack / Infra"
-        title="100% Supabase, sin otro deployer"
-        desc="Cada capa elegida para costo cero en la fase inicial y una sola cuenta: desarrollo local con Supabase CLI, producción en Supabase Cloud + Hosting."
-      />
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <Section id="stack" label="Stack" title="Con qué está hecho">
+      <div className="rounded-[18px] border border-hair bg-white">
         {stack.map((s) => (
-          <div
-            key={s.layer}
-            style={accentVars(s.accent)}
-            className="rounded-[var(--radius)] border border-line bg-card p-4 transition-colors hover:border-line-accent"
-          >
-            <div className="mb-1 font-mono text-[0.65rem] uppercase tracking-[0.12em]" style={{ color: 'var(--a)' }}>
-              {s.layer}
-            </div>
-            <div className="mb-1 text-[0.95rem] font-bold text-fg">{s.tech}</div>
-            <div className="text-[0.76rem] leading-snug text-fg-muted">{s.note}</div>
+          <div key={s.layer} className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-paper-2 px-4 py-3 last:border-b-0">
+            <span className="w-[110px] text-[0.75rem] font-bold tracking-[0.06em] text-ink-2 uppercase">{s.layer}</span>
+            <b className="flex-[1_1_200px] text-[0.9375rem] text-ink">{s.tech}</b>
+            <span className="flex-[2_1_260px] text-[0.875rem] text-ink-2">{s.note}</span>
           </div>
         ))}
       </div>
-    </section>
+    </Section>
   )
 }

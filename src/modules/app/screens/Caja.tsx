@@ -23,6 +23,7 @@ import {
   useOpenShift,
   useOpenShiftMutation,
   useParseCapture,
+  useShiftCash,
   useSuppliers,
   useTodayCashMovements,
   useTodaySales,
@@ -61,11 +62,14 @@ export function Caja() {
   const [cashSheet, setCashSheet] = useState(false)
   const [turnoSheet, setTurnoSheet] = useState(false)
 
-  // Con turno abierto se cuadra el turno; sin turno, el día.
-  const inShift = <T extends { shift_id: string | null }>(r: T) => !shift || r.shift_id === shift.id
-  const cashSales = sales.filter((s) => s.payment_method === 'efectivo' && inShift(s)).reduce((a, s) => a + Number(s.total), 0)
-  const ins = cash.filter((m) => !KIND[m.kind].out && inShift(m)).reduce((a, m) => a + Number(m.amount), 0)
-  const outs = cash.filter((m) => KIND[m.kind].out && inShift(m)).reduce((a, m) => a + Number(m.amount), 0)
+  // Con turno abierto se cuadra el turno (aunque cruce la medianoche); sin turno, el día.
+  const { data: sc } = useShiftCash(shift)
+  const dayCashSales = sales.filter((s) => s.payment_method === 'efectivo').reduce((a, s) => a + Number(s.total), 0)
+  const dayIns = cash.filter((m) => !KIND[m.kind].out).reduce((a, m) => a + Number(m.amount), 0)
+  const dayOuts = cash.filter((m) => KIND[m.kind].out).reduce((a, m) => a + Number(m.amount), 0)
+  const cashSales = shift ? (sc?.cashSales ?? 0) : dayCashSales
+  const ins = shift ? (sc?.ins ?? 0) : dayIns
+  const outs = shift ? (sc?.outs ?? 0) : dayOuts
   const expected = (shift?.opening_cash ?? 0) + cashSales + ins - outs
   const salesTotal = sales.reduce((a, s) => a + Number(s.total), 0)
 

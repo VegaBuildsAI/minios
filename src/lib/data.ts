@@ -40,6 +40,8 @@ export interface DashboardStats {
   salesTodayCount: number
   criticalCount: number
   fiadoTotal: number
+  /** Clientes con saldo de fiado > 0. */
+  fiadoClients: number
   productsCount: number
 }
 
@@ -62,6 +64,7 @@ export function useDashboardStats() {
         salesTodayCount: sales.length,
         criticalCount: products.filter((p) => Number(p.stock_qty) <= Number(p.min_qty)).length,
         fiadoTotal: customers.reduce((s, r) => s + Number(r.balance_debt), 0),
+        fiadoClients: customers.filter((r) => Number(r.balance_debt) > 0).length,
         productsCount: products.length,
       }
     },
@@ -130,6 +133,154 @@ async function currentUserId(): Promise<string | null> {
   return data.user?.id ?? null
 }
 
+/** Movimientos de inventario de hoy agrupados por razón (cantidad de movimientos y unidades). */
+export function useTodayMovementsSummary() {
+  return useQuery({
+    queryKey: ['movements', 'today-summary'],
+    refetchInterval: 60_000,
+    queryFn: async (): Promise<Partial<Record<MovementReason, { count: number; units: number }>>> => {
+      const { data, error } = await supabase.from('stock_movements').select('reason, delta').gte('created_at', startOfToday()).limit(5000)
+      if (error) throw error
+      const out: Partial<Record<MovementReason, { count: number; units: number }>> = {}
+      for (const m of (data ?? []) as { reason: MovementReason; delta: number }[]) {
+        const r = (out[m.reason] ??= { count: 0, units: 0 })
+        r.count++
+        r.units += Math.abs(Number(m.delta))
+      }
+      return out
+    },
+  })
+}
+
+export type ActivityKind = 'venta' | 'tiquete' | 'inventario' | 'bitacora' | 'orden' | 'turno' | 'efectivo'
+
+export interface ActivityItem {
+  id: string
+  kind: ActivityKind
+  at: string
+  title: string
+  module: string
+  by: string | null
+}
+
+const MOVE_LABEL: Record<MovementReason, string> = {
+  sale: 'Venta',
+  purchase: 'Compra',
+  entrada: 'Entrada',
+  merma: 'Merma',
+  robo: 'Robo',
+  vencimiento: 'Vencimiento',
+  ajuste: 'Ajuste',
+}
+const CASH_LABEL: Record<CashKind, string> = { ingreso: 'Entrada de efectivo', pago_proveedor: 'Pago a proveedor', gasto: 'Gasto', retiro: 'Retiro del dueño' }
+const PAY_LABEL: Record<PaymentMethod, string> = { efectivo: 'Efectivo', sinpe: 'SINPE', tarjeta: 'Tarjeta', fiado: 'Fiado' }
+const crc = (n: number) => '₡' + Math.round(n).toLocaleString('es-CR')
+
+type SaleAct = { id: string; total: number; payment_method: PaymentMethod; capture_id: string | null; ticket_number: string | null; staff_id: string | null; created_at: string }
+type MoveAct = { id: string; delta: number; reason: MovementReason; created_by: string | null; created_at: string; products: { name: string } | null }
+type CapAct = { id: string; type: CaptureType; raw_input: string | null; file_name: string | null; created_by: string | null; created_at: string }
+type PoAct = { id: string; status: string; total: number; created_at: string; suppliers: { name: string } | null }
+type ShiftAct = { id: string; opening_cash: number; opened_at: string; closed_at: string | null; staff_id: string | null }
+type CashAct = { id: string; kind: CashKind; amount: number; note: string | null; created_by: string | null; created_at: string }
+
+/**
+ * Feed del Panel de Control: los últimos registros de cada módulo, en paralelo, unidos
+ * y ordenados por fecha. Las bajas por venta las crea el trigger de inventario, así que
+ * de stock_movements se omiten las de razón `sale` (ya aparecen como tiquete).
+ */
+export function useRecentActivity(limit = 8) {
+  return useQuery({
+    queryKey: ['activity', limit],
+    refetchInterval: 60_000,
+    queryFn: async (): Promise<ActivityItem[]> => {
+      const n = limit
+      const [sales, moves, caps, pos, shifts, cash, profs] = await Promise.all([
+        supabase.from('sales').select('id, total, payment_method, capture_id, ticket_number, staff_id, created_at').order('created_at', { ascending: false }).limit(n),
+        supabase.from('stock_movements').select('id, delta, reason, created_by, created_at, products(name)').neq('reason', 'sale').order('created_at', { ascending: false }).limit(n),
+        supabase.from('captures').select('id, type, raw_input, file_name, created_by, created_at').order('created_at', { ascending: false }).limit(n),
+        supabase.from('purchase_orders').select('id, status, total, created_at, suppliers(name)').order('created_at', { ascending: false }).limit(n),
+        supabase.from('shifts').select('id, opening_cash, closed_at, opened_at, staff_id').order('opened_at', { ascending: false }).limit(n),
+        supabase.from('cash_movements').select('id, kind, amount, note, created_by, created_at').order('created_at', { ascending: false }).limit(n),
+        supabase.from('profiles').select('id, full_name'),
+      ])
+      for (const r of [sales, moves, caps, pos, shifts, cash]) if (r.error) throw r.error
+      const who = new Map(((profs.data ?? []) as { id: string; full_name: string }[]).map((p) => [p.id, p.full_name || null]))
+      const by = (id: string | null) => (id ? (who.get(id) ?? null) : null)
+      const items: ActivityItem[] = []
+
+      for (const s of (sales.data ?? []) as SaleAct[]) {
+        const t = s.capture_id ? 'Tiquete' : 'Venta'
+        items.push({
+          id: `s-${s.id}`,
+          kind: s.capture_id ? 'tiquete' : 'venta',
+          at: s.created_at,
+          title: `${t}${s.ticket_number ? ` N.° ${s.ticket_number}` : ''} ${crc(Number(s.total))} · ${PAY_LABEL[s.payment_method]}`,
+          module: 'Caja',
+          by: by(s.staff_id),
+        })
+      }
+      for (const m of (moves.data ?? []) as unknown as MoveAct[]) {
+        const d = Number(m.delta)
+        items.push({ id: `m-${m.id}`, kind: 'inventario', at: m.created_at, title: `${MOVE_LABEL[m.reason]} ${d > 0 ? '+' : ''}${d} · ${m.products?.name ?? 'producto'}`, module: 'Inventario', by: by(m.created_by) })
+      }
+      for (const c of (caps.data ?? []) as CapAct[]) {
+        const what = c.type === 'voice' ? 'Nota de voz' : c.type === 'text' ? 'Nota' : c.raw_input === 'Tiquete de caja' ? 'Foto de tiquete' : (c.file_name ?? 'Archivo')
+        items.push({ id: `c-${c.id}`, kind: 'bitacora', at: c.created_at, title: what, module: 'Bitácora', by: by(c.created_by) })
+      }
+      for (const o of (pos.data ?? []) as unknown as PoAct[]) {
+        items.push({ id: `o-${o.id}`, kind: 'orden', at: o.created_at, title: `Orden ${o.status} ${crc(Number(o.total))}${o.suppliers ? ` · ${o.suppliers.name}` : ''}`, module: 'Proveedores', by: null })
+      }
+      for (const t of (shifts.data ?? []) as ShiftAct[]) {
+        items.push({ id: `t-${t.id}`, kind: 'turno', at: t.opened_at, title: `Turno abierto · ${crc(Number(t.opening_cash))}`, module: 'Caja', by: by(t.staff_id) })
+        if (t.closed_at) items.push({ id: `tc-${t.id}`, kind: 'turno', at: t.closed_at, title: 'Turno cerrado', module: 'Caja', by: by(t.staff_id) })
+      }
+      for (const m of (cash.data ?? []) as CashAct[]) {
+        items.push({ id: `e-${m.id}`, kind: 'efectivo', at: m.created_at, title: `${CASH_LABEL[m.kind]} ${crc(Number(m.amount))}${m.note ? ` · ${m.note}` : ''}`, module: 'Caja', by: by(m.created_by) })
+      }
+      return items.sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit)
+    },
+  })
+}
+
+export interface ShiftCash {
+  /** Tiquetes cobrados en efectivo dentro del turno. */
+  cashSales: number
+  /** Entradas de efectivo que no son ventas (fondo, etc.). */
+  ins: number
+  /** Gastos, pagos a proveedor y retiros. */
+  outs: number
+  /** apertura + cashSales + ins − outs */
+  expected: number
+}
+
+/**
+ * Cuadre del turno abierto. Se calcula por `shift_id` (no por «hoy») para que un turno
+ * que cruza la medianoche siga sumando lo que pasó antes de las 00:00.
+ */
+export function useShiftCash(shift: Shift | null | undefined) {
+  return useQuery({
+    queryKey: ['shift-cash', shift?.id ?? null],
+    enabled: !!shift,
+    queryFn: async (): Promise<ShiftCash> => {
+      const s = shift as Shift
+      const [salesRes, cashRes] = await Promise.all([
+        supabase.from('sales').select('total').eq('shift_id', s.id).eq('payment_method', 'efectivo'),
+        supabase.from('cash_movements').select('kind, amount').eq('shift_id', s.id),
+      ])
+      if (salesRes.error) throw salesRes.error
+      if (cashRes.error) throw cashRes.error
+      const cashSales = ((salesRes.data ?? []) as { total: number }[]).reduce((a, r) => a + Number(r.total), 0)
+      let ins = 0
+      let outs = 0
+      for (const m of (cashRes.data ?? []) as { kind: CashKind; amount: number }[]) {
+        if (m.kind === 'ingreso') ins += Number(m.amount)
+        else outs += Number(m.amount)
+      }
+      return { cashSales, ins, outs, expected: Number(s.opening_cash) + cashSales + ins - outs }
+    },
+  })
+}
+
 /** Entradas y salidas de efectivo de hoy (las que no son ventas). */
 export function useTodayCashMovements() {
   return useQuery({
@@ -161,7 +312,10 @@ export function useAddCashMovement() {
       })
       if (error) throw error
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['cash_movements'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['cash_movements'] })
+      qc.invalidateQueries({ queryKey: ['shift-cash'] })
+    },
   })
 }
 
@@ -206,6 +360,7 @@ export function useRegisterTicket() {
       qc.invalidateQueries({ queryKey: ['stats'] })
       qc.invalidateQueries({ queryKey: ['sales'] })
       qc.invalidateQueries({ queryKey: ['movements'] })
+      qc.invalidateQueries({ queryKey: ['shift-cash'] })
     },
   })
 }
@@ -679,7 +834,7 @@ export interface DayPoint { day: string; total: number }
 
 /** Granularidad de la tendencia: por hora (período de 1 día) o por día. */
 export type TrendGranularity = 'hour' | 'day'
-export interface TrendPoint { key: string; label: string; ventas: number; ganancia: number }
+export interface TrendPoint { key: string; label: string; ventas: number; ganancia: number; tickets: number }
 
 const pad2 = (n: number) => String(n).padStart(2, '0')
 /** Clave de día en HORA LOCAL (evita que las ventas de la tarde-noche en UTC−6 caigan al día siguiente). */
@@ -694,11 +849,11 @@ function emptyTrend(fromISO: string, toISO: string, gran: TrendGranularity): Tre
   const out: TrendPoint[] = []
   if (gran === 'hour') {
     const base = localDayKey(start)
-    for (let h = 0; h < 24; h++) out.push({ key: `${base} ${pad2(h)}`, label: `${h}h`, ventas: 0, ganancia: 0 })
+    for (let h = 0; h < 24; h++) out.push({ key: `${base} ${pad2(h)}`, label: `${h}h`, ventas: 0, ganancia: 0, tickets: 0 })
   } else {
     const d = new Date(start.getFullYear(), start.getMonth(), start.getDate())
     while (d <= end) {
-      out.push({ key: localDayKey(d), label: pad2(d.getDate()), ventas: 0, ganancia: 0 })
+      out.push({ key: localDayKey(d), label: pad2(d.getDate()), ventas: 0, ganancia: 0, tickets: 0 })
       d.setDate(d.getDate() + 1)
     }
   }
@@ -718,6 +873,8 @@ export interface SalesReport {
   topByMargin: TopProduct[]
   byMethod: Record<string, number>
   fiadoTotal: number
+  /** Ganancia por producto y por bucket de la tendencia (clave = TrendPoint.key). */
+  marginByProductBucket: Record<string, Record<string, number>>
 }
 
 export function useSalesReport(fromISO: string, toISO: string, granularity: TrendGranularity = 'day') {
@@ -744,6 +901,7 @@ export function useSalesReport(fromISO: string, toISO: string, granularity: Tren
       const customers = (custRes.data ?? []) as { balance_debt: number }[]
 
       const byProd: Record<string, TopProduct> = {}
+      const marginByProductBucket: Record<string, Record<string, number>> = {}
       const trend = emptyTrend(fromISO, toISO, granularity)
       const trendIndex = new Map(trend.map((t) => [t.key, t]))
       let revenue = 0
@@ -753,6 +911,7 @@ export function useSalesReport(fromISO: string, toISO: string, granularity: Tren
         const c = Number(it.qty) * Number(it.products?.cost_price ?? 0)
         revenue += rev
         cost += c
+        const pid = it.products?.id ?? it.products?.name ?? '—'
         if (it.sales?.created_at) {
           const dt = new Date(it.sales.created_at)
           const key = granularity === 'hour' ? `${localDayKey(dt)} ${pad2(dt.getHours())}` : localDayKey(dt)
@@ -761,8 +920,9 @@ export function useSalesReport(fromISO: string, toISO: string, granularity: Tren
             bucket.ventas += rev
             bucket.ganancia += rev - c
           }
+          const pm = (marginByProductBucket[pid] ??= {})
+          pm[key] = (pm[key] ?? 0) + rev - c
         }
-        const pid = it.products?.id ?? it.products?.name ?? '—'
         const name = it.products?.name ?? '—'
         byProd[pid] ??= { productId: pid, name, qty: 0, revenue: 0, margin: 0, marginPct: 0 }
         byProd[pid].qty += Number(it.qty)
@@ -777,6 +937,9 @@ export function useSalesReport(fromISO: string, toISO: string, granularity: Tren
         const day = localDayKey(new Date(s.created_at))
         byDayMap[day] = (byDayMap[day] ?? 0) + Number(s.total)
         byMethod[s.payment_method] = (byMethod[s.payment_method] ?? 0) + Number(s.total)
+        const dt = new Date(s.created_at)
+        const bucket = trendIndex.get(granularity === 'hour' ? `${localDayKey(dt)} ${pad2(dt.getHours())}` : localDayKey(dt))
+        if (bucket) bucket.tickets++
       }
 
       const prods = Object.values(byProd)
@@ -794,6 +957,7 @@ export function useSalesReport(fromISO: string, toISO: string, granularity: Tren
         topByMargin: [...prods].sort((a, b) => b.margin - a.margin).slice(0, 10),
         byMethod,
         fiadoTotal: customers.reduce((s, r) => s + Number(r.balance_debt), 0),
+        marginByProductBucket,
       }
     },
   })

@@ -35,8 +35,11 @@ function TileCard({ tile }: { tile: Tile }) {
   return <div className="opacity-70">{body}</div>
 }
 
+const ROLE_LABEL = { superadmin: 'Superadmin', owner: 'Dueño', staff: 'Personal' } as const
+
 export function Mas() {
   const { profile, signOut } = useAuth()
+  const isAdmin = profile?.role === 'owner' || profile?.role === 'superadmin'
   return (
     <div>
       <ScreenHeader title="Más" subtitle="Todos los módulos de MiniOS." />
@@ -48,7 +51,7 @@ export function Mas() {
           </div>
           <div className="flex-1">
             <div className="text-[0.9375rem] font-semibold text-ink">{profile.full_name || 'Usuario'}</div>
-            <div className="text-[0.8125rem] capitalize text-ink-2">{profile.role}</div>
+            <div className="text-[0.8125rem] text-ink-2">{ROLE_LABEL[profile.role]}</div>
           </div>
           <button
             onClick={() => void signOut()}
@@ -65,18 +68,20 @@ export function Mas() {
         ))}
       </div>
 
-      <Link to="/control">
-        <Card className="flex items-center gap-3 p-4">
-          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-ink text-white">
-            <LayoutDashboard size={20} />
-          </span>
-          <div className="flex-1">
-            <div className="text-[0.9375rem] font-semibold text-ink">Panel de Control</div>
-            <div className="text-[0.8125rem] text-ink-2">Vista admin · superadmin</div>
-          </div>
-          <ChevronRight size={18} className="text-ink-3" />
-        </Card>
-      </Link>
+      {isAdmin && (
+        <Link to="/control">
+          <Card className="flex items-center gap-3 p-4">
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-ink text-white">
+              <LayoutDashboard size={20} />
+            </span>
+            <div className="flex-1">
+              <div className="text-[0.9375rem] font-semibold text-ink">Panel de Control</div>
+              <div className="text-[0.8125rem] text-ink-2">Vista de escritorio · dueño y superadmin</div>
+            </div>
+            <ChevronRight size={18} className="text-ink-3" />
+          </Card>
+        </Link>
+      )}
     </div>
   )
 }

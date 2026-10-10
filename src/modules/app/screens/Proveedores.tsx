@@ -10,16 +10,7 @@ import {
   useSuppliers,
 } from '@/lib/data'
 import { formatCRC, type POStatus, type Supplier } from '@/lib/types'
-
-const DAYS = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado']
-const DAY_SHORT = ['D', 'L', 'M', 'K', 'J', 'V', 'S']
-const norm = (d: string) =>
-  d
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim()
-const visitsOn = (s: Supplier, day: string) => (s.visit_days ?? []).some((d) => norm(d) === day)
+import { DAYS, DAY_SHORT, visitsOn } from '@/lib/visits'
 
 const PO_TONE: Record<POStatus, Tone> = { borrador: 'neutral', enviada: 'amber', recibida: 'brand', cancelada: 'rose' }
 const PO_LABEL: Record<POStatus, string> = { borrador: 'Borrador', enviada: 'Enviada', recibida: 'Recibida', cancelada: 'Cancelada' }

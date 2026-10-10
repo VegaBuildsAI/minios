@@ -4,27 +4,7 @@ import { ChevronRight, Truck } from 'lucide-react'
 import { Card, Chip } from '../components'
 import { useProducts, useSuppliers } from '@/lib/data'
 import type { Supplier } from '@/lib/types'
-
-const DAYS = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado']
-const DAY_LABEL: Record<string, string> = {
-  domingo: 'Domingo',
-  lunes: 'Lunes',
-  martes: 'Martes',
-  miercoles: 'Miércoles',
-  jueves: 'Jueves',
-  viernes: 'Viernes',
-  sabado: 'Sábado',
-}
-
-/** "Miércoles " → "miercoles" (visit_days se guardó sin tildes y a veces con mayúsculas). */
-const norm = (s: string) =>
-  s
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .trim()
-
-const visits = (s: Supplier, day: string) => (s.visit_days ?? []).some((d) => norm(d) === day)
+import { DAYS, DAY_LABEL, visitsOn } from '@/lib/visits'
 
 /** Proveedores que visitan hoy; si hoy no viene nadie, los del próximo día con visita. */
 export function SupplierToday() {
@@ -33,11 +13,11 @@ export function SupplierToday() {
 
   const { suppliersToShow, when, isToday } = useMemo(() => {
     const dow = new Date().getDay()
-    const today = suppliers.filter((s) => visits(s, DAYS[dow]))
+    const today = suppliers.filter((s) => visitsOn(s, DAYS[dow]))
     if (today.length > 0) return { suppliersToShow: today, when: 'Hoy', isToday: true }
     for (let offset = 1; offset <= 7; offset++) {
       const day = DAYS[(dow + offset) % 7]
-      const next = suppliers.filter((s) => visits(s, day))
+      const next = suppliers.filter((s) => visitsOn(s, day))
       if (next.length > 0) {
         return { suppliersToShow: next, when: offset === 1 ? 'Mañana' : DAY_LABEL[day], isToday: false }
       }

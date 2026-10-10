@@ -112,6 +112,17 @@
   --m-danger: #a3241a;
   --m-danger-tint: #f9e1de;
   --m-ok: #15803d;
+  /* Panel de Control: vidrio translúcido y series de gráficos (validadas sobre papel) */
+  --m-glass: rgba(255, 255, 255, 0.55);
+  --m-glass-border: rgba(14, 90, 71, 0.16);
+  --m-chart-grid: rgba(27, 31, 28, 0.08);
+  --m-chart-1: #12845f;
+  --m-chart-2: #c98314;
+  --m-cat-1: #12845f;
+  --m-cat-2: #c98314;
+  --m-cat-3: #5672d9;
+  --m-cat-4: #c2557a;
+  --m-font-mono: 'JetBrains Mono', ui-monospace, monospace;
   --m-font-display: 'Bricolage Grotesque', 'Instrument Sans', system-ui, sans-serif;
   --m-font-body: 'Instrument Sans', system-ui, sans-serif;
 }
@@ -172,6 +183,9 @@
   --color-danger: var(--m-danger);
   --color-danger-tint: var(--m-danger-tint);
   --color-ok: var(--m-ok);
+  --color-chart-1: var(--m-chart-1);
+  --color-chart-2: var(--m-chart-2);
+  --font-mono-m: var(--m-font-mono);
   --font-display-m: var(--m-font-display);
   --font-body-m: var(--m-font-body);
 }
@@ -238,6 +252,14 @@ body {
 .mostrador .font-display-m {
   font-family: var(--m-font-display);
   letter-spacing: -0.02em;
+}
+/* Tarjeta de vidrio del Panel de Control */
+.mostrador .glass {
+  background: var(--m-glass);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--m-glass-border);
+  border-radius: 18px;
 }
 /* Cifras alineadas en columnas */
 .mostrador .tabular-nums {

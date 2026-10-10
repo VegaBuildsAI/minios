@@ -1,49 +1,61 @@
 /**
  * solution-map.ts — Manifiesto único de MiniOS.
  *
- * Fuente de verdad de TODO el paquete de la solución: módulos, accesos/roles,
- * flujos, reportes, esquema de base de datos y stack. El Panel de Control
- * (mapa visual en Fase 0, centro en vivo en Fase 2) lee de aquí, y el
- * showcase `minios-preview.html` refleja lo mismo. Un solo lugar que editar.
+ * Fuente de verdad del paquete de la solución: módulos, accesos/roles, flujos,
+ * reportes, esquema de base de datos y stack. «Conoce la app» (/control/conoce)
+ * lee de aquí. Un solo lugar que editar.
  */
 
-export type AccentKey =
-  | 'orange'
-  | 'green'
-  | 'blue'
-  | 'red'
-  | 'purple'
-  | 'amber'
-  | 'cyan'
+/** Nombre de ícono lucide; se resuelve en `modules/control/icons.ts`. */
+export type IconName =
+  | 'receipt'
+  | 'package'
+  | 'truck'
+  | 'notebook'
+  | 'chart'
+  | 'settings'
+  | 'sparkles'
+  | 'camera'
+  | 'scan'
+  | 'check'
+  | 'database'
+  | 'trending-down'
+  | 'alert'
+  | 'calendar'
+  | 'clipboard'
+  | 'coins'
+  | 'search'
+  | 'message'
 
 export type ModuleStatus = 'planned' | 'building' | 'ready'
 export type Priority = 'P0' | 'P1' | 'P2'
 export type RoleId = 'superadmin' | 'owner' | 'staff'
+/** 2 = total, 1 = ver/consultar, 0 = sin acceso */
+export type AccessLevel = 0 | 1 | 2
 
 export interface ModuleDef {
   id: string // M1..M7
   code: string // slug de la ruta / carpeta
   name: string
-  icon: string
+  icon: IconName
   description: string
   priority: Priority
   status: ModuleStatus
-  accent: AccentKey
   features: string[]
+  /** Pantalla de la app móvil donde vive el módulo. */
+  appPath: string
 }
 
 export interface RoleDef {
   id: RoleId
   name: string
   who: string
-  accent: AccentKey
-  /** módulos (por code) que ve este rol; '*' = todos */
-  modules: string[] | '*'
+  /** Nivel de acceso por módulo (code). */
+  access: Record<string, AccessLevel>
   notes: string
 }
 
 export interface FlowStep {
-  icon: string
   title: string
   desc: string
 }
@@ -51,7 +63,6 @@ export interface FlowStep {
 export interface FlowDef {
   id: string
   name: string
-  accent: AccentKey
   trigger: string
   steps: FlowStep[]
 }
@@ -65,7 +76,7 @@ export interface ReportDef {
 
 export interface DbTableDef {
   name: string
-  group: 'Usuarios' | 'Catálogo' | 'Ventas' | 'Inventario' | 'Compras' | 'Caja' | 'Bitácora'
+  group: 'Usuarios' | 'Catálogo' | 'Ventas' | 'Inventario' | 'Compras' | 'Caja' | 'Bitácora e IA' | 'Configuración'
   desc: string
   columns: string
 }
@@ -74,7 +85,6 @@ export interface StackLayerDef {
   layer: string
   tech: string
   note: string
-  accent: AccentKey
 }
 
 export interface SolutionMeta {
@@ -88,13 +98,13 @@ export interface SolutionMeta {
 export const meta: SolutionMeta = {
   name: 'MiniOS',
   tagline:
-    'Micro-ERP para minisúper. Toda la operación —caja, inventario, proveedores, bitácora y reportes— desde el celular, con una capa de IA que convierte lo informal en datos.',
+    'Micro-ERP para minisúper. Caja, inventario, proveedores, bitácora y reportes desde el celular, con una capa de IA que convierte lo informal —tiquetes y facturas en foto, notas de voz— en datos.',
   version: 'v0.1',
   country: 'Costa Rica',
   stats: [
     { num: '7', label: 'Módulos' },
     { num: '$0', label: 'Costo inicial' },
-    { num: '100%', label: 'Supabase' },
+    { num: '100 %', label: 'Supabase' },
     { num: 'PWA', label: 'Instalable' },
   ],
 }
@@ -103,205 +113,197 @@ export const modules: ModuleDef[] = [
   {
     id: 'M1',
     code: 'pos',
-    name: 'Caja (POS)',
-    icon: '🛒',
+    name: 'Caja',
+    icon: 'receipt',
     description:
-      'Punto de venta lineal: búsqueda o escaneo de producto, carrito, IVA 13%, y pagos en efectivo, SINPE, tarjeta o fíado. Turno con apertura y cierre por conteo.',
+      'Las ventas se cobran en la caja registradora. MiniOS registra cada tiquete (foto → IA → productos enrutados al inventario) y las entradas y salidas de efectivo: gastos, pagos a proveedor, retiros. Turno con apertura y cuadre.',
     priority: 'P0',
     status: 'ready',
-    accent: 'orange',
-    features: ['Escaneo cámara', 'IVA 13%', 'SINPE / Fíado', 'Cambio', 'Colilla PDF', 'Turno'],
+    features: ['Tiquete con IA', 'Enrutar al inventario', 'Salidas de efectivo', 'Turno y cuadre'],
+    appPath: '/app/caja',
   },
   {
     id: 'M2',
     code: 'inventory',
     name: 'Inventario en tiempo real',
-    icon: '📦',
+    icon: 'package',
     description:
-      'Catálogo con costo, precio e inventario. Deducción automática en cada venta, inventario crítico con alerta, ajuste manual con razón e historial de movimientos.',
+      'Costo, precio e inventario. Baja con cada tiquete registrado; alerta de crítico, entrada manual de mercadería, productos nuevos y ajustes con razón e historial.',
     priority: 'P0',
     status: 'ready',
-    accent: 'green',
-    features: ['Auto-deducción', 'Inventario crítico', 'Merma / robo', 'Historial', 'SKU / código'],
+    features: ['Auto-deducción', 'Entrada manual', 'Merma / robo', 'Historial'],
+    appPath: '/app/inventario',
   },
   {
     id: 'M3',
     code: 'suppliers',
-    name: 'Proveedores & Compras',
-    icon: '🚚',
-    description:
-      'Directorio de proveedores con días de visita, órdenes de compra sugeridas, recepción que actualiza inventario y alerta si el precio de recepción difiere del histórico.',
+    name: 'Proveedores y compras',
+    icon: 'truck',
+    description: 'Días de visita, órdenes sugeridas y recepción que actualiza el inventario.',
     priority: 'P1',
     status: 'ready',
-    accent: 'blue',
-    features: ['Directorio', 'Orden sugerida', 'Recepción → inventario', 'Alerta de precio'],
+    features: ['Directorio', 'Orden sugerida', 'Recepción', 'Visitas de la semana'],
+    appPath: '/app/proveedores',
   },
   {
     id: 'M4',
     code: 'bitacora',
-    name: 'Bitácora (captura informal)',
-    icon: '📓',
-    description:
-      'Reemplaza el cuaderno. Captura texto, voz o archivos (foto/PDF); la IA transcribe y clasifica cada documento y el usuario confirma antes de cargar nada al inventario.',
+    name: 'Bitácora',
+    icon: 'notebook',
+    description: 'Reemplaza el cuaderno: texto, voz o foto/PDF. La IA transcribe y clasifica; el usuario confirma antes de cargar nada.',
     priority: 'P1',
     status: 'ready',
-    accent: 'purple',
-    features: ['Texto libre', 'Foto / PDF + IA', 'Voz → STT', 'Transcripción', 'Confirma → BD'],
+    features: ['Texto', 'Voz', 'Foto / PDF + IA', 'Confirmar'],
+    appPath: '/app/bitacora',
   },
   {
     id: 'M5',
     code: 'reports',
-    name: 'Reportes & Cuadre',
-    icon: '📈',
-    description:
-      'Ventas por período, más vendidos por volumen y margen, cuentas por cobrar (fíado), cuadre de turno (efectivo esperado vs. contado) y export CSV / PDF.',
+    name: 'Reportes y cuadre',
+    icon: 'chart',
+    description: 'Ventas por período, margen, más vendidos, cuentas por cobrar y cuadre de turno, con CSV.',
     priority: 'P1',
     status: 'ready',
-    accent: 'amber',
-    features: ['Período custom', 'Margen', 'Cuentas por cobrar', 'Cuadre de caja', 'CSV / PDF'],
+    features: ['Margen', 'Fiado', 'Cuadre', 'CSV'],
+    appPath: '/app/reports',
   },
   {
     id: 'M6',
     code: 'settings',
     name: 'Configuración',
-    icon: '⚙️',
-    description:
-      'Perfil del negocio, tasa de impuesto (IVA 13% CR), moneda CRC / USD, gestión de usuarios y roles, y configuración de notificaciones.',
+    icon: 'settings',
+    description: 'Perfil del negocio, IVA, moneda CRC / USD, usuarios y roles, y control de la IA.',
     priority: 'P1',
     status: 'ready',
-    accent: 'cyan',
-    features: ['Perfil', 'IVA / Moneda', 'Usuarios & roles', 'Notificaciones'],
+    features: ['Perfil', 'IVA / Moneda', 'Roles', 'Tope IA'],
+    appPath: '/app/config',
   },
   {
     id: 'M7',
     code: 'ai',
-    name: 'Capa de IA (transversal)',
-    icon: '🤖',
+    name: 'Capa de IA',
+    icon: 'sparkles',
     description:
-      'Claude Haiku 4.5 desde Supabase Edge Functions: lee y transcribe documentos de la Bitácora y alimenta al asistente con herramientas acotadas. Siempre propone; el usuario confirma. Tope de gasto diario y bitácora de uso.',
+      'Claude Haiku 4.5 en Edge Functions: lee tiquetes, facturas y notas, y responde con herramientas acotadas. Siempre propone; tope de gasto diario.',
     priority: 'P1',
     status: 'ready',
-    accent: 'red',
-    features: ['Lectura de documentos', 'Aplicar factura al inventario', 'Asistente con herramientas', 'Tope de gasto', 'Caché por hash'],
+    features: ['Lectura de documentos', 'Asistente', 'Tope de gasto', 'Caché por hash'],
+    appPath: '/app/assistant',
   },
 ]
+
+const ALL: Record<string, AccessLevel> = { pos: 2, inventory: 2, suppliers: 2, bitacora: 2, reports: 2, settings: 2, ai: 2 }
 
 export const roles: RoleDef[] = [
   {
     id: 'superadmin',
-    name: 'Superadmin (AXIO)',
-    who: 'Michael — desarrollador AXIO',
-    accent: 'orange',
-    modules: '*',
-    notes:
-      'Acceso total + Panel de Control en vivo, logs del sistema, gestión de usuarios y config de IA. Usuario inicial: admin@minios.test.',
+    name: 'Superadmin',
+    who: 'AXIO · + Panel de Control y usuarios',
+    access: ALL,
+    notes: 'Acceso total, Panel de Control, gestión de usuarios y configuración de IA.',
   },
   {
     id: 'owner',
     name: 'Dueño',
-    who: 'Dueño del minisúper',
-    accent: 'green',
-    modules: ['pos', 'inventory', 'suppliers', 'bitacora', 'reports', 'settings', 'ai'],
-    notes: 'Todo lo operativo: caja, inventario, proveedores, reportes, bitácora, configuración e IA.',
+    who: 'Aplica facturas, órdenes y ajustes',
+    access: ALL,
+    notes: 'Todo lo operativo, incluido el Panel de Control.',
   },
   {
     id: 'staff',
-    name: 'Staff',
-    who: 'Empleado (TBD)',
-    accent: 'blue',
-    modules: ['pos', 'bitacora'],
-    notes: 'Solo caja + bitácora básica. Sin reportes financieros ni inventario completo.',
+    name: 'Personal',
+    who: 'Registra tiquetes y anota',
+    access: { pos: 2, inventory: 1, suppliers: 0, bitacora: 2, reports: 0, settings: 0, ai: 1 },
+    notes: 'Caja y Bitácora; consulta inventario y asistente. Sin reportes ni configuración.',
   },
 ]
 
 export const flows: FlowDef[] = [
   {
-    id: 'sale',
-    name: 'Venta → Inventario',
-    accent: 'orange',
-    trigger: 'Cierre de venta en Caja',
+    id: 'ticket',
+    name: 'Tiquete → Inventario',
+    trigger: 'venta cobrada en la caja registradora',
     steps: [
-      { icon: '🔎', title: 'Buscar / escanear', desc: 'Producto por nombre, código o cámara' },
-      { icon: '🧺', title: 'Carrito', desc: 'Subtotal + IVA 13% → total' },
-      { icon: '💳', title: 'Cobrar', desc: 'Efectivo, SINPE, tarjeta o fíado' },
-      { icon: '📉', title: 'Deducir inventario', desc: 'stock_movements baja el inventario' },
-      { icon: '⚠️', title: 'Alerta', desc: 'Badge si inventario ≤ mínimo' },
+      { title: 'Foto del tiquete', desc: 'Desde Caja, con el celular' },
+      { title: 'IA lee', desc: 'Total, número y líneas' },
+      { title: 'Enrutar', desc: 'Cada línea a un producto' },
+      { title: 'Registrar', desc: 'Venta en una sola transacción' },
+      { title: 'Descontar', desc: 'Baja el inventario y alerta si queda ≤ mínimo' },
     ],
   },
   {
     id: 'capture',
-    name: 'Captura → IA → BD',
-    accent: 'purple',
-    trigger: 'Nota en Bitácora (texto / foto / voz)',
+    name: 'Captura → IA → Base de datos',
+    trigger: 'entrada en Bitácora',
     steps: [
-      { icon: '✍️', title: 'Captura', desc: 'Texto, foto o audio' },
-      { icon: '🧠', title: 'IA lee', desc: 'Clasifica + transcribe en 1 llamada' },
-      { icon: '📝', title: 'Borrador', desc: 'Revisión línea por línea' },
-      { icon: '✅', title: 'Confirmar', desc: 'Usuario valida' },
-      { icon: '🗄️', title: 'Carga a BD', desc: 'Se estructura el dato' },
+      { title: 'Capturar', desc: 'Texto, foto o audio' },
+      { title: 'IA lee', desc: 'Clasifica y transcribe en 1 llamada' },
+      { title: 'Borrador', desc: 'Revisión línea por línea' },
+      { title: 'Confirmar', desc: 'El usuario valida' },
+      { title: 'Guardar', desc: 'Queda como dato estructurado' },
     ],
   },
   {
     id: 'purchase',
     name: 'Compra a proveedor',
-    accent: 'blue',
-    trigger: 'Proveedor visita hoy / inventario bajo',
+    trigger: 'visita del proveedor o inventario bajo',
     steps: [
-      { icon: '📅', title: 'Visita / mínimo', desc: 'Trigger por día o por inventario' },
-      { icon: '🧾', title: 'Orden sugerida', desc: 'IA propone cantidades' },
-      { icon: '📦', title: 'Recepción', desc: 'Pedido vs. recibido' },
-      { icon: '📈', title: 'Actualiza inventario', desc: 'Entra al inventario' },
-      { icon: '💰', title: 'Alerta precio', desc: 'Si difiere del histórico' },
+      { title: 'Visita / mínimo', desc: 'Por día o por inventario' },
+      { title: 'Orden sugerida', desc: 'La IA propone cantidades' },
+      { title: 'Recepción', desc: 'Factura con IA o entrada manual' },
+      { title: 'Inventario', desc: 'Entra al stock' },
+      { title: 'Pago', desc: 'Salida de efectivo en Caja' },
     ],
   },
   {
-    id: 'ai-cron',
-    name: 'IA proactiva (cron diario)',
-    accent: 'red',
-    trigger: 'Una vez al día (apertura o cierre)',
+    id: 'cash',
+    name: 'Cuadre de caja',
+    trigger: 'cierre de turno',
     steps: [
-      { icon: '🗃️', title: 'Analiza BD', desc: 'Ventas, inventario, márgenes' },
-      { icon: '🏆', title: 'Rentables', desc: 'Top por margen, no solo volumen' },
-      { icon: '⏳', title: 'Llegarán a mínimo', desc: 'Pedidos anticipados' },
-      { icon: '💬', title: 'Resumen', desc: 'En lenguaje natural' },
+      { title: 'Apertura', desc: 'Fondo inicial' },
+      { title: 'Tiquetes', desc: 'Ventas en efectivo' },
+      { title: 'Salidas', desc: 'Gastos, pagos y retiros' },
+      { title: 'Cuadre', desc: 'Esperado vs. contado' },
     ],
   },
 ]
 
 export const reports: ReportDef[] = [
-  { name: 'Ventas por período', desc: 'Día / semana / mes con rango custom', formats: ['CSV', 'PDF'], module: 'reports' },
-  { name: 'Más vendidos', desc: 'Por volumen y por margen', formats: ['CSV', 'PDF'], module: 'reports' },
+  { name: 'Ventas por período', desc: 'Día, semana o mes', formats: ['CSV'], module: 'reports' },
+  { name: 'Más vendidos', desc: 'Por volumen y por margen', formats: ['CSV'], module: 'reports' },
   { name: 'Margen por producto', desc: 'Costo vs. ingreso', formats: ['CSV'], module: 'reports' },
-  { name: 'Cuentas por cobrar', desc: 'Fíado pendiente por cliente', formats: ['CSV', 'PDF'], module: 'reports' },
-  { name: 'Cuadre de turno', desc: 'Efectivo esperado vs. contado', formats: ['PDF'], module: 'reports' },
-  { name: 'Resumen diario IA', desc: 'Lenguaje natural + señales', formats: ['App'], module: 'ai' },
+  { name: 'Cuentas por cobrar', desc: 'Fiado pendiente por cliente', formats: ['En la app'], module: 'reports' },
+  { name: 'Cuadre de turno', desc: 'Efectivo esperado vs. contado', formats: ['En la app'], module: 'pos' },
+  { name: 'Asistente IA', desc: 'Preguntas en lenguaje natural sobre tus datos', formats: ['En la app'], module: 'ai' },
 ]
 
 export const dbTables: DbTableDef[] = [
-  { name: 'profiles', group: 'Usuarios', desc: 'Extiende auth.users con rol', columns: 'id, full_name, role, is_active' },
-  { name: 'products', group: 'Catálogo', desc: 'Catálogo con costo, precio e inventario', columns: 'name, sku, barcode, cost_price, sale_price, stock_qty, min_qty' },
-  { name: 'categories', group: 'Catálogo', desc: 'Categorías del catálogo', columns: 'name, color, icon, sort_order' },
-  { name: 'suppliers', group: 'Catálogo', desc: 'Proveedores y días de visita', columns: 'name, phone, visit_days, notes' },
-  { name: 'sales', group: 'Ventas', desc: 'Encabezado de venta', columns: 'staff_id, customer_id, payment_method, subtotal, tax, total, shift_id' },
-  { name: 'sale_items', group: 'Ventas', desc: 'Líneas de venta', columns: 'sale_id, product_id, qty, unit_price' },
-  { name: 'customers', group: 'Ventas', desc: 'Clientes de fíado', columns: 'name, phone, balance_debt' },
-  { name: 'stock_movements', group: 'Inventario', desc: 'Movimientos de inventario', columns: 'product_id, delta, reason, reference_id' },
-  { name: 'purchase_orders', group: 'Compras', desc: 'Órdenes de compra', columns: 'supplier_id, status, total, received_at' },
-  { name: 'purchase_items', group: 'Compras', desc: 'Líneas de compra', columns: 'po_id, product_id, qty_ordered, qty_received, unit_cost' },
-  { name: 'shifts', group: 'Caja', desc: 'Turnos de caja', columns: 'staff_id, opening_cash, closing_cash, total_sales' },
-  { name: 'captures', group: 'Bitácora', desc: 'Captura informal y archivos', columns: 'type, category, raw_input, file_path/name/mime/size, parsed_json, status, confirmed_at' },
+  { name: 'profiles', group: 'Usuarios', desc: 'Rol de cada usuario', columns: 'id, full_name, role, is_active' },
+  { name: 'products', group: 'Catálogo', desc: 'Costo, precio e inventario', columns: 'name, sku, barcode, cost_price, sale_price, stock_qty, min_qty' },
+  { name: 'categories', group: 'Catálogo', desc: 'Categorías', columns: 'name, color, icon, sort_order' },
+  { name: 'suppliers', group: 'Catálogo', desc: 'Proveedores y visitas', columns: 'name, phone, visit_days, notes' },
+  { name: 'sales', group: 'Ventas', desc: 'Tiquete registrado y pago', columns: 'payment_method, subtotal, tax, total, shift_id, capture_id, ticket_number' },
+  { name: 'sale_items', group: 'Ventas', desc: 'Líneas del tiquete', columns: 'sale_id, product_id, qty, unit_price' },
+  { name: 'customers', group: 'Ventas', desc: 'Clientes de fiado', columns: 'name, phone, balance_debt' },
+  { name: 'stock_movements', group: 'Inventario', desc: 'Cada entrada y salida', columns: 'product_id, delta, reason, reference_id' },
+  { name: 'purchase_orders', group: 'Compras', desc: 'Órdenes', columns: 'supplier_id, status, total, received_at' },
+  { name: 'purchase_items', group: 'Compras', desc: 'Pedido vs. recibido', columns: 'po_id, product_id, qty_ordered, qty_received, unit_cost' },
+  { name: 'shifts', group: 'Caja', desc: 'Turnos y cuadre', columns: 'staff_id, opening_cash, closing_cash, total_sales' },
+  { name: 'cash_movements', group: 'Caja', desc: 'Entradas y salidas de efectivo', columns: 'shift_id, kind, amount, note, supplier_id' },
+  { name: 'captures', group: 'Bitácora e IA', desc: 'Entradas y archivos', columns: 'type, category, raw_input, file_path, parsed_json, ai_status, status' },
+  { name: 'ai_usage', group: 'Bitácora e IA', desc: 'Tokens y costo de cada llamada', columns: 'fn, model, input_tokens, output_tokens, cost_usd' },
+  { name: 'business_settings', group: 'Configuración', desc: 'Perfil del negocio e IA', columns: 'name, tax_rate, currency, ai_enabled, ai_daily_budget_usd' },
 ]
 
 export const stack: StackLayerDef[] = [
-  { layer: 'Frontend', tech: 'React 18 + Vite + TS', note: 'SPA responsive, mobile-first', accent: 'orange' },
-  { layer: 'UI', tech: 'Tailwind + shadcn/ui', note: 'Design system heredado, claro/oscuro', accent: 'blue' },
-  { layer: 'State', tech: 'Zustand', note: 'Un store por módulo', accent: 'green' },
-  { layer: 'Backend', tech: 'Supabase Postgres', note: 'Base de datos + RLS por rol', accent: 'cyan' },
-  { layer: 'Auth', tech: 'Supabase Auth', note: 'Magic link + roles', accent: 'purple' },
-  { layer: 'Storage', tech: 'Supabase Storage', note: 'Fotos y audios de bitácora', accent: 'amber' },
-  { layer: 'Realtime', tech: 'Supabase Realtime', note: 'Alertas de inventario en vivo', accent: 'green' },
-  { layer: 'IA / Cron', tech: 'Edge Functions', note: 'Triggers + resumen diario', accent: 'red' },
-  { layer: 'Deploy', tech: 'Supabase Hosting', note: '100% Supabase, sin otro deployer', accent: 'blue' },
+  { layer: 'Frontend', tech: 'React 19 + Vite 8 + TypeScript', note: 'PWA instalable, pensada para celular' },
+  { layer: 'UI', tech: 'Tailwind v4 · sistema «Mostrador»', note: 'Tokens propios, accesible AA' },
+  { layer: 'Datos', tech: 'TanStack Query + supabase-js', note: 'Caché y refresco por módulo' },
+  { layer: 'Backend', tech: 'Supabase Postgres', note: 'RLS por rol, RPC atómicas' },
+  { layer: 'Auth', tech: 'Supabase Auth', note: 'Contraseña o enlace mágico (PKCE)' },
+  { layer: 'Archivos', tech: 'Supabase Storage', note: 'Bucket privado de Bitácora' },
+  { layer: 'IA', tech: 'Edge Functions + Claude Haiku 4.5', note: 'Lectura de documentos y asistente, con tope diario' },
+  { layer: 'Hosting', tech: 'Cloudflare Pages', note: 'Frontend estático; Supabase sirve los datos' },
 ]
 
 export const solutionMap = { meta, modules, roles, flows, reports, dbTables, stack }
