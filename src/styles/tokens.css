@@ -284,3 +284,76 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ============================================================
+   Inicio: introducción y «Mini», el compañero animado.
+   Con «reducir movimiento» del sistema, la regla de .mostrador
+   deja todas estas animaciones en ~0 ms.
+   ============================================================ */
+@keyframes intro-rise {
+  from { opacity: 0; transform: translateY(14px); filter: blur(4px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+.intro-rise {
+  animation: intro-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+.intro-soft {
+  animation: intro-rise 0.35s ease-out both;
+  animation-delay: calc(var(--d, 0ms) / 4);
+}
+
+@keyframes bot-drop {
+  0% { opacity: 0; transform: translateY(-40px) scale(0.6) rotate(-8deg); }
+  60% { opacity: 1; transform: translateY(6px) scale(1.05) rotate(3deg); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes bot-fade { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: none; } }
+.minibot-enter { animation: bot-drop 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) 0.25s both; }
+.minibot-fade { animation: bot-fade 0.35s ease-out both; }
+.minibot:focus-visible { outline: 2px solid var(--m-brand); outline-offset: 2px; }
+
+@keyframes bot-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+.minibot-float { animation: bot-float 3.2s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 100%; }
+@keyframes bot-shadow { 0%, 100% { transform: scaleX(1); opacity: 1; } 50% { transform: scaleX(0.85); opacity: 0.7; } }
+.minibot-shadow { animation: bot-shadow 3.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+
+@keyframes bot-hop {
+  0% { transform: translateY(0) rotate(0); }
+  35% { transform: translateY(-16px) rotate(-6deg); }
+  70% { transform: translateY(0) rotate(4deg); }
+  100% { transform: translateY(0) rotate(0); }
+}
+.minibot-hop { animation: bot-hop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+@keyframes bot-shake { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-4deg); } 75% { transform: rotate(4deg); } }
+.minibot-shake { animation: bot-shake 0.5s ease-in-out 2, bot-float 3.2s ease-in-out 1s infinite; }
+
+@keyframes bot-wave { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-38deg); } 75% { transform: rotate(-14deg); } }
+.minibot-wave { animation: bot-wave 0.7s ease-in-out 1s 3; transform-box: fill-box; transform-origin: 30% 10%; }
+
+@keyframes bot-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+.minibot-blink { animation: bot-blink 4.2s infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes bot-look { 0%, 40%, 100% { transform: translateX(0); } 55%, 85% { transform: translateX(4px); } }
+.minibot-look { animation: bot-look 3s ease-in-out infinite, bot-blink 4.2s infinite; }
+
+@keyframes bot-face-in { from { opacity: 0; transform: scale(0.7); } to { opacity: 1; transform: none; } }
+.minibot-face { animation: bot-face-in 0.25s ease-out; transform-box: fill-box; transform-origin: center; }
+.minibot-glow { filter: drop-shadow(0 0 3px rgba(78, 230, 168, 0.8)); }
+
+@keyframes bot-led { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+.minibot-led { animation: bot-led 1.8s ease-in-out infinite; }
+[data-mood='worried'] .minibot-led { animation-duration: 0.7s; }
+
+@keyframes bot-z { 0% { opacity: 0; transform: translate(0, 6px); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(6px, -10px); } }
+.minibot-z text { animation: bot-z 2.4s ease-in-out infinite; }
+.minibot-z text:nth-child(2) { animation-delay: 0.8s; }
+@keyframes bot-dot { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+.minibot-dots circle { animation: bot-dot 1.2s ease-in-out infinite; }
+.minibot-dots circle:nth-child(2) { animation-delay: 0.2s; }
+.minibot-dots circle:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes bubble-pop { from { opacity: 0; transform: translateY(8px) scale(0.94); } to { opacity: 1; transform: none; } }
+.bubble-pop { animation: bubble-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both; animation-delay: var(--d, 0ms); transform-origin: 70% 0; }
+@keyframes caret { 50% { opacity: 0; } }
+.type-caret { display: inline-block; width: 2px; height: 1em; margin-left: 1px; vertical-align: -0.12em; background: var(--m-brand); animation: caret 0.8s steps(1) infinite; }
