@@ -52,7 +52,7 @@ Layout: filas `flex-wrap` (gráfico `flex: 2 1 560px` + tarjeta `flex: 1 1 300px
 
 ## 4. «Conoce la app» — cambios de contenido
 - Hero oscuro (`bg-ink`) **sin chip/etiqueta superior** (se eliminó «Conoce la app · v0.1 · Costa Rica» por redundante), título «MiniOS: todo el minisúper en el celular», `meta.tagline`, recuadro «¿Qué es un ERP?» y 4 stats.
-- **«Micro-ERP» → «Mini-ERP»** en todo el producto: `solution-map.ts` (`meta.tagline`), `index.html` (`<meta name="description">`), `auth/Login.tsx` y docs. Buscar con `grep -rn "Micro-ERP"`.
+- **«Mini-ERP»** es el nombre de la categoría en todo el producto (antes se usaba otro término): `solution-map.ts` (`meta.tagline`), `index.html` (`<meta name="description">`), `auth/Login.tsx` y docs.
 - Recuadro **«¿Qué es un ERP?»** bajo el tagline (fondo `rgba(255,255,255,.06)`, borde `#3A413C`, rótulo en `text-marigold`): «**ERP** = *Enterprise Resource Planning*, en español **Planificación de Recursos Empresariales**: un solo sistema que conecta las áreas del negocio —ventas, inventario, compras, caja y reportes— para que todos trabajen con los mismos datos. MiniOS es la versión *mini*, hecha a la medida de un minisúper.» Guardarlo en `solution-map.ts` como `meta.erpDefinition` para no escribirlo fijo en el componente.
 - Nav de secciones pegajosa (pills): Módulos · Flujos · Accesos · Reportes · Base de datos · Stack.
 - Módulos: tarjetas con ID/prioridad, estado, descripción y features (sin emojis: quitar `icon` de `solution-map.ts` o mapear a lucide).
