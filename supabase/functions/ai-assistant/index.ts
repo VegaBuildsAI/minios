@@ -26,11 +26,12 @@ import {
   norm,
   requireUser,
   type Usage,
+  DEFAULT_MODEL,
+  NO_THINKING,
 } from '../_shared/ai.ts'
 import { APP_CONTEXT } from '../_shared/context.ts'
-import { briefing } from './briefing.ts'
 
-const MODEL = Deno.env.get('AI_MODEL_ASSISTANT') ?? 'claude-haiku-4-5'
+const MODEL = Deno.env.get('AI_MODEL_ASSISTANT') ?? DEFAULT_MODEL
 const KEEP_MESSAGES = 8
 const MAX_LOOPS = 4
 const MAX_OUT_TOKENS = 700
@@ -116,12 +117,6 @@ Deno.serve(
     const { user, db, admin } = await requireUser(req)
     const body = await req.json().catch(() => ({}))
 
-    // «Mini» en el Inicio: lee el estado real y lo cuenta en una sola llamada.
-    if (body?.mode === 'briefing') {
-      await guard(admin, user.id, 'assistant')
-      const goal = Math.min(Math.max(Number(body?.goal) || 0, 0), 100_000_000)
-      return json(await briefing(db, admin, user.id, goal))
-    }
 
     // Historial: solo texto, últimos turnos, empezando y terminando en 'user'.
     const history = (Array.isArray(body?.messages) ? body.messages : [])
@@ -365,8 +360,12 @@ Deno.serve(
     try {
       for (let i = 0; i < MAX_LOOPS; i++) {
         // deno-lint-ignore no-explicit-any
-        const res: any = await client.messages.create({ model: MODEL, max_tokens: MAX_OUT_TOKENS, system, tools: TOOLS, messages: msgs } as any)
+        const res: any = await client.messages.create({ model: MODEL, max_tokens: MAX_OUT_TOKENS, thinking: NO_THINKING, system, tools: TOOLS, messages: msgs } as any)
         usage = addUsage(usage, res.usage)
+        if (res.stop_reason === 'refusal') {
+          reply = 'No puedo ayudar con eso. Preguntame sobre ventas, inventario, proveedores o documentos del negocio.'
+          break
+        }
         if (res.stop_reason === 'tool_use') {
           msgs.push({ role: 'assistant', content: res.content })
           // deno-lint-ignore no-explicit-any

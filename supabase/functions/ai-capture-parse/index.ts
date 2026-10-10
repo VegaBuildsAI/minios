@@ -24,9 +24,11 @@ import {
   json,
   logUsage,
   requireUser,
+  DEFAULT_MODEL,
+  NO_THINKING,
 } from '../_shared/ai.ts'
 
-const MODEL = Deno.env.get('AI_MODEL_EXTRACT') ?? 'claude-haiku-4-5'
+const MODEL = Deno.env.get('AI_MODEL_EXTRACT') ?? DEFAULT_MODEL
 const MAX_PDF_INPUT_TOKENS = 12_000 // ~5-6 páginas; más que eso no es una factura/recibo típico
 
 const num = { anyOf: [{ type: 'number' }, { type: 'null' }] }
@@ -213,11 +215,14 @@ Deno.serve(
       const res: any = await client.messages.create({
         model: MODEL,
         max_tokens: 2048, // tope de seguridad; la salida real es compacta (~300 tokens)
+        thinking: NO_THINKING,
         system: SYSTEM,
         output_config: { format: { type: 'json_schema', schema: SCHEMA } },
         messages,
       } as any)
 
+      // Haiku no tiene respaldo del servidor ante un rechazo de seguridad: se informa y no se cobra de nuevo.
+      if (res.stop_reason === 'refusal') throw new HttpError(422, 'La IA no pudo leer este documento. Revisalo a mano.')
       if (res.stop_reason === 'max_tokens') throw new HttpError(422, 'El documento tiene demasiado detalle para leerlo completo. Subilo por partes.')
       const text = res.content.find((b: { type: string }) => b.type === 'text')?.text
       if (!text) throw new HttpError(502, 'La IA no devolvió datos.')

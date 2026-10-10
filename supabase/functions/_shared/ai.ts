@@ -54,6 +54,17 @@ function friendlyApiError(e: InstanceType<typeof Anthropic.APIError>): string {
   return 'La IA no pudo responder ahora. Reintentá.'
 }
 
+/** Modelo por defecto: Haiku 5.5 (el más barato con visión, PDF, tools y structured outputs). */
+export const DEFAULT_MODEL = 'claude-haiku-5-5'
+
+/**
+ * Haiku 5.5 trae razonamiento adaptativo encendido por defecto (se cobra como salida).
+ * Nuestras tareas son de extracción y consulta corta: se apaga (válido con effort ≤ high).
+ */
+export const NO_THINKING = { type: 'disabled' } as const
+
+export type AiFn = 'capture-parse' | 'assistant' | 'mini-daily'
+
 export function claude(): Anthropic {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
   if (!apiKey) throw new HttpError(503, 'La IA no está configurada (falta ANTHROPIC_API_KEY en los secrets de Supabase).')
@@ -83,9 +94,9 @@ export async function requireUser(req: Request): Promise<AuthCtx> {
 }
 
 // Límite por usuario por hora (frena bucles y abusos; el presupuesto diario es el tope duro).
-const HOURLY_LIMIT: Record<string, number> = { 'capture-parse': 40, assistant: 80 }
+const HOURLY_LIMIT: Record<AiFn, number> = { 'capture-parse': 40, assistant: 80, 'mini-daily': 6 }
 
-export async function guard(admin: SupabaseClient, userId: string, fn: 'capture-parse' | 'assistant') {
+export async function guard(admin: SupabaseClient, userId: string | null, fn: AiFn) {
   const { data: s } = await admin.from('business_settings').select('ai_enabled, ai_daily_budget_usd').eq('id', 1).maybeSingle()
   if (s && s.ai_enabled === false) throw new HttpError(403, 'La IA está desactivada (Configuración → IA).')
 
@@ -95,6 +106,7 @@ export async function guard(admin: SupabaseClient, userId: string, fn: 'capture-
     throw new HttpError(429, `Se alcanzó el presupuesto diario de IA (US$${budget.toFixed(2)}). Podés subirlo en Configuración.`)
   }
 
+  if (!userId) return // tarea programada (cron): solo interruptor y presupuesto
   const since = new Date(Date.now() - 3_600_000).toISOString()
   const { count } = await admin
     .from('ai_usage')
@@ -107,6 +119,7 @@ export async function guard(admin: SupabaseClient, userId: string, fn: 'capture-
 
 // USD por millón de tokens (entrada / salida). Modelo desconocido → se asume el más caro (nunca subestimar).
 const PRICES: Record<string, { in: number; out: number }> = {
+  'claude-haiku-5-5': { in: 0.1, out: 0.5 },
   'claude-haiku-4-5': { in: 1, out: 5 },
   'claude-sonnet-5-5': { in: 2, out: 10 },
   'claude-sonnet-5': { in: 2, out: 10 },
@@ -120,9 +133,10 @@ export interface Usage {
   cache_creation_input_tokens?: number | null
 }
 
-export function costUsd(model: string, u: Usage): number {
+/** Costo en USD. `batch` = Message Batches API (50 % de descuento en todos los tokens). */
+export function costUsd(model: string, u: Usage, batch = false): number {
   const p = PRICES[model] ?? PRICES['claude-opus-5-5']
-  return (
+  return (batch ? 0.5 : 1) * (
     (u.input_tokens * p.in +
       u.output_tokens * p.out +
       (u.cache_read_input_tokens ?? 0) * p.in * 0.1 +
@@ -142,9 +156,9 @@ export function addUsage(a: Usage, b: Usage): Usage {
 
 export async function logUsage(
   admin: SupabaseClient,
-  row: { userId: string; fn: 'capture-parse' | 'assistant'; model: string; usage: Usage; refId?: string | null },
+  row: { userId: string | null; fn: AiFn; model: string; usage: Usage; refId?: string | null; batch?: boolean },
 ): Promise<number> {
-  const cost = costUsd(row.model, row.usage)
+  const cost = costUsd(row.model, row.usage, row.batch)
   const { error } = await admin.from('ai_usage').insert({
     user_id: row.userId,
     fn: row.fn,
