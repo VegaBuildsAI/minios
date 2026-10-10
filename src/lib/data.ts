@@ -1103,7 +1103,7 @@ export interface MiniPlaybook {
   generated_at: string
 }
 
-/** Plan de hoy de «Mini» (lo genera mini-daily a las 8:00 CR). Leerlo no llama a la IA. */
+/** Plan de hoy de «Mini» (lo genera mini-daily a las 9:00 CR). Leerlo no llama a la IA. */
 export function useMiniPlaybook() {
   return useQuery({
     queryKey: ['mini-playbook', crDayKey()],

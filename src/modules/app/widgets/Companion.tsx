@@ -40,7 +40,7 @@ function useTyped(text: string, key: string, delay: number, speed: number) {
 /**
  * «Mini» en el Inicio: un globo blanco con el mensaje y Mini afuera, en la esquina
  * derecha. Sin chat ni sugerencias y sin llamar a la IA: cuenta el plan del día (lo
- * redacta mini-daily una vez, 8:00 CR, con cifras en vivo) y los avisos locales.
+ * redacta mini-daily una vez, 9:00 CR, con cifras en vivo) y los avisos locales.
  * Tocar a Mini pasa al siguiente aviso; «Ver» lleva a la pantalla donde se resuelve.
  * Su ánimo cambia con el aviso y con lo que hace el usuario (se duerme si nadie toca).
  */

@@ -20,8 +20,8 @@ Regla aplicada: antes de cada commit se revisó `git log` para detectar commits 
 
 ## 3. Mini: una llamada a la IA por día
 - **Edge Function `mini-daily`**: `ml.ts` (determinístico, sin IA) calcula pronóstico por producto (índice semanal × suavizado exponencial), días para agotarse, stock de seguridad, pedido sugerido hasta la próxima visita, ABC por ganancia, tendencia, anomalía (z), hora pico y pares que se compran juntos. Una sola llamada a **Claude Haiku 5.5** redacta textos por franja horaria y consejos desde un resumen compacto.
-- **Programación** (`pg_cron` + `pg_net`, URL y secreto en Vault): una sola ejecución a las **8:00 CR** con llamada directa (migración `20261012080000`; antes era lote 8:00 + recogida 9:00).
-- **Costo medido**: llamada directa ≈ US$0.0004/día (1220 tokens de entrada + 590 de salida). Sin IA (apagada, sin presupuesto o error) queda la redacción local.
+- **Programación** (`pg_cron` + `pg_net`, URL y secreto en Vault): 8:00 CR envía un **Message Batch (−50 %)**; 9:00 CR lo recoge (si no terminó, lo cancela y llama directo).
+- **Costo medido**: lote US$0.000208/día (1220 tokens de entrada + 590 de salida); llamada directa US$0.0004. Sin IA (apagada, sin presupuesto o error) queda la redacción local.
 - **Inicio**: globo blanco con el mensaje y Mini afuera a la derecha; **sin chat ni sugerencias**, 0 llamadas a funciones al abrir. Las cifras del momento ({v} ventas, {t} tiquetes, {m} % meta, {e} efectivo) se rellenan en vivo. Tocar a Mini pasa al siguiente aviso.
 - Panel de Control → Bitácora e IA: estado del plan (hora, tokens, costo) y botón **Regenerar** (owner+).
 - Todas las funciones de IA pasaron a `claude-haiku-5-5` (US$0.10 / 0.50 por MTok) con razonamiento apagado y manejo de `refusal`. La pantalla **Asistente** sigue usando IA bajo demanda.

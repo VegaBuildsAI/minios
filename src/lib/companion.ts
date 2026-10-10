@@ -155,7 +155,7 @@ export function useCompanion(goal: number, slot: DaySlot) {
 const SLOT_KEY: Record<DaySlot, PlaybookSlot> = { buho: 'mad', medianoche: 'mad', temprano: 'tem', manana: 'man', mediodia: 'med', tarde: 'tar', noche: 'noc' }
 
 /**
- * Mensaje de «Mini» para esta franja, tomado del plan del día (mini-daily, 8:00 CR).
+ * Mensaje de «Mini» para esta franja, tomado del plan del día (mini-daily, 9:00 CR).
  * Las cifras del momento se rellenan en vivo: {v} ventas, {t} tiquetes, {m} % de meta,
  * {e} efectivo esperado. No llama a la IA.
  */
