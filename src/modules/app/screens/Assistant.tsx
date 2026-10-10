@@ -1,10 +1,20 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, CheckCheck, FileText, Mic, Send, Sparkles, Square, X } from 'lucide-react'
-import { askAssistant, useCaptureStats, useDashboardStats, useProducts } from '@/lib/data'
+import { ArrowLeft, CheckCheck, FileText, Mic, Send, Sparkles } from 'lucide-react'
+import {
+  askAssistant,
+  uploadBitacoraFile,
+  useBusinessSettings,
+  useCaptureStats,
+  useCreateCapture,
+  useDashboardStats,
+  useParseCapture,
+  useProducts,
+} from '@/lib/data'
 import { formatCRC, type Product, type Proposal } from '@/lib/types'
 import { useAuth } from '@/modules/auth/context'
 import { ProposalCard } from '../widgets/ProposalCard'
+import { ListeningScreen } from '../widgets/ListeningScreen'
 import type { DashboardStats } from '@/lib/data'
 import { fmtTime } from '@/lib/time'
 
@@ -14,6 +24,7 @@ interface Msg {
   time: string
   proposals?: Proposal[]
   error?: boolean
+  action?: { label: string; to: string }
 }
 
 function now() {
@@ -45,15 +56,16 @@ interface SpeechRecognitionLike {
   lang: string
   interimResults: boolean
   continuous: boolean
-  onresult: (e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void
+  onresult: (e: { results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal: boolean }> }) => void
+  onerror: (e: { error: string }) => void
   onend: () => void
   start: () => void
   stop: () => void
+  abort: () => void
 }
-function getRecognition(): SpeechRecognitionLike | null {
+function recognitionCtor(): (new () => SpeechRecognitionLike) | undefined {
   const w = window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike }
-  const Ctor = w.SpeechRecognition || w.webkitSpeechRecognition
-  return Ctor ? new Ctor() : null
+  return w.SpeechRecognition || w.webkitSpeechRecognition
 }
 
 export function Assistant() {
@@ -65,9 +77,18 @@ export function Assistant() {
   ])
   const [busy, setBusy] = useState(false)
   const [input, setInput] = useState('')
-  const [listening, setListening] = useState(false)
+  // Voz primero: el Asistente abre escuchando; el teclado lleva al chat escrito.
+  // Sin dictado en este navegador, queda el chat escrito.
+  const [mode, setMode] = useState<'voice' | 'chat'>(() => (recognitionCtor() ? 'voice' : 'chat'))
+  const [phase, setPhase] = useState<'listening' | 'review'>('listening')
+  const [heard, setHeard] = useState({ final: '', interim: '' })
+  const heardRef = useRef('')
   const recRef = useRef<SpeechRecognitionLike | null>(null)
-  const cancelVoiceRef = useRef(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const cameraRef = useRef<HTMLInputElement>(null)
+  const createCapture = useCreateCapture()
+  const parseCapture = useParseCapture()
+  const { data: settings } = useBusinessSettings()
   const { profile } = useAuth()
   const firstName = (profile?.full_name || 'Michael').split(' ')[0]
   const { data: captureStats } = useCaptureStats()
@@ -105,38 +126,119 @@ export function Assistant() {
     }
   }
 
-  const toggleVoice = () => {
-    if (listening) {
-      recRef.current?.stop()
-      return
-    }
-    const rec = getRecognition()
-    if (!rec) {
-      alert('Tu navegador no soporta dictado. Usá Chrome o escribí tu pregunta.')
-      return
-    }
+  /** Corta el dictado sin enviar nada. */
+  const cancelVoice = useCallback(() => {
+    const rec = recRef.current
+    recRef.current = null
+    if (!rec) return
+    rec.onresult = () => {}
+    rec.onerror = () => {}
+    rec.onend = () => {}
+    rec.abort()
+  }, [])
+
+  /** Arranca el reconocedor; el estado solo cambia desde sus eventos. */
+  const listen = useCallback(() => {
+    cancelVoice()
+    const Ctor = recognitionCtor()
+    if (!Ctor) return
+    const rec = new Ctor()
+    heardRef.current = ''
     rec.lang = 'es-CR'
     rec.interimResults = true
     rec.continuous = false
-    let final = ''
     rec.onresult = (e) => {
-      let tx = ''
-      for (let i = 0; i < e.results.length; i++) tx += e.results[i][0].transcript
-      final = tx
-      setInput(tx)
-    }
-    rec.onend = () => {
-      setListening(false)
-      if (cancelVoiceRef.current) {
-        cancelVoiceRef.current = false
-        setInput('')
-        return
+      let fin = ''
+      let int = ''
+      for (let i = 0; i < e.results.length; i++) {
+        if (e.results[i].isFinal) fin += e.results[i][0].transcript
+        else int += e.results[i][0].transcript
       }
-      if (final.trim()) send(final)
+      heardRef.current = (fin + int).trim()
+      setHeard({ final: fin, interim: int })
+    }
+    // Permiso negado, sin micrófono o sin voz: onend llega igual y, sin texto, pasa al chat.
+    rec.onerror = () => {}
+    rec.onend = () => {
+      recRef.current = null
+      if (heardRef.current) setPhase('review')
+      else setMode('chat')
     }
     recRef.current = rec
-    setListening(true)
-    rec.start()
+    try {
+      rec.start()
+    } catch {
+      rec.onend()
+    }
+  }, [cancelVoice])
+
+  useEffect(() => {
+    listen()
+    return cancelVoice
+  }, [listen, cancelVoice])
+
+  const startVoice = () => {
+    if (!recognitionCtor()) {
+      alert('Tu navegador no soporta dictado. Usá Chrome o escribí tu pregunta.')
+      return
+    }
+    setHeard({ final: '', interim: '' })
+    setPhase('listening')
+    setMode('voice')
+    listen()
+  }
+
+  const closeVoice = () => {
+    cancelVoice()
+    if (msgs.length > 1) setMode('chat')
+    else navigate('/app')
+  }
+
+  const toKeyboard = (text: string) => {
+    cancelVoice()
+    setInput(text)
+    setMode('chat')
+    requestAnimationFrame(() => inputRef.current?.focus())
+  }
+
+  const sendHeard = (text: string) => {
+    setMode('chat')
+    send(text)
+  }
+
+  const openCamera = () => {
+    cancelVoice()
+    setMode('chat')
+    cameraRef.current?.click()
+  }
+
+  // Foto de un documento → Bitácora (borrador) → lectura con IA, igual que en la Bitácora.
+  const onPhoto = async (files: FileList | null) => {
+    const original = files?.[0]
+    if (cameraRef.current) cameraRef.current.value = ''
+    if (!original) return
+    setBusy(true)
+    try {
+      const file = await uploadBitacoraFile(original)
+      const id = await createCapture.mutateAsync({ type: 'file', rawInput: original.name, category: 'notas', file })
+      const ai = settings?.ai_enabled !== false
+      if (ai) parseCapture.mutate({ id })
+      setMsgs((m) => [
+        ...m,
+        {
+          role: 'bot',
+          text: ai
+            ? 'Subí la foto a la Bitácora y la IA la está leyendo. Queda en borrador hasta que la confirmés.'
+            : 'Subí la foto a la Bitácora. La lectura con IA está apagada; revisala ahí.',
+          time: now(),
+          action: { label: 'Ver en Bitácora', to: '/app/bitacora' },
+        },
+      ])
+    } catch (e) {
+      setMsgs((m) => [...m, { role: 'bot', text: `No pude subir la foto: ${(e as Error).message}`, time: now(), error: true }])
+    } finally {
+      setBusy(false)
+    }
   }
 
   const CAPS: { tag: string; q: string }[] = [
@@ -218,6 +320,14 @@ export function Assistant() {
               {m.proposals?.map((p) => (
                 <ProposalCard key={p.id} p={p} />
               ))}
+              {m.action && (
+                <button
+                  onClick={() => navigate(m.action!.to)}
+                  className="mt-2 flex h-10 items-center rounded-xl bg-brand-tint px-3.5 text-[0.875rem] font-bold text-brand"
+                >
+                  {m.action.label}
+                </button>
+              )}
             </div>
           ) : (
             <div key={i} className="flex flex-col items-end">
@@ -245,6 +355,7 @@ export function Assistant() {
         <label className="flex h-12 min-w-0 flex-1 items-center rounded-full bg-paper px-4">
           <span className="sr-only">Escribí tu pregunta</span>
           <input
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && send(input)}
@@ -252,62 +363,32 @@ export function Assistant() {
             className="min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-ink-3"
           />
         </label>
-        {input.trim() && !listening ? (
+        {input.trim() ? (
           <button onClick={() => send(input)} disabled={busy} aria-label="Enviar" className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand text-white disabled:opacity-50">
             <Send size={22} aria-hidden="true" />
           </button>
         ) : (
-          <button onClick={toggleVoice} aria-label="Hablar con el asistente" className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-ink text-marigold">
+          <button onClick={startVoice} aria-label="Hablar con el asistente" className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-ink text-marigold">
             <Mic size={24} aria-hidden="true" />
           </button>
         )}
       </div>
 
-      {/* Modo escucha (pantalla completa) */}
-      {listening && (
-        <div className="absolute inset-0 z-20 flex flex-col bg-ink text-paper" role="dialog" aria-label="Escuchando">
-          <div className="flex items-center px-4 py-3.5">
-            <button
-              onClick={() => {
-                cancelVoiceRef.current = true
-                recRef.current?.stop()
-              }}
-              aria-label="Cancelar"
-              className="flex h-11 w-11 items-center justify-center rounded-full text-paper"
-            >
-              <X size={22} aria-hidden="true" />
-            </button>
-            <div className="flex-1 text-center text-[0.875rem] font-semibold text-[#b9bfb9]">Español (Costa Rica)</div>
-            <div className="w-11" />
-          </div>
-          <div className="flex flex-1 flex-col gap-5 px-7 pt-10">
-            <div className="flex items-center gap-2 text-[0.8125rem] font-bold tracking-[0.08em] text-marigold uppercase">
-              <span className="h-2 w-2 rounded-full bg-marigold" /> Escuchando
-            </div>
-            <p aria-live="polite" className="font-display-m text-[2rem] leading-[1.2] font-semibold text-white">
-              {input || 'Decí tu pregunta…'}
-            </p>
-            <p className="text-[0.9375rem] leading-relaxed text-[#b9bfb9]">Cuando dejés de hablar envío la pregunta.</p>
-          </div>
-          <div className="flex h-[120px] items-center justify-center gap-1.5" aria-hidden="true">
-            {[18, 30, 46, 64, 80, 96, 72, 104, 84, 60, 92, 56, 38, 26, 16].map((h, i) => (
-              <span
-                key={i}
-                className="w-1.5 origin-center animate-pulse rounded-full"
-                style={{ height: h, background: i > 3 && i < 11 ? 'var(--m-marigold)' : '#5e665f', animationDelay: `${i * 0.07}s` }}
-              />
-            ))}
-          </div>
-          <div className="flex justify-center px-6 pt-6 pb-[max(env(safe-area-inset-bottom),2.5rem)]">
-            <button
-              onClick={() => recRef.current?.stop()}
-              aria-label="Terminar y enviar"
-              className="flex h-[84px] w-[84px] items-center justify-center rounded-full bg-marigold text-ink shadow-[0_0_0_10px_rgba(245,184,61,0.18),0_0_0_22px_rgba(245,184,61,0.08)]"
-            >
-              <Square size={26} fill="currentColor" aria-hidden="true" />
-            </button>
-          </div>
-        </div>
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={(e) => onPhoto(e.target.files)} className="hidden" />
+
+      {/* Modo escucha (pantalla completa, diseño Cowork) */}
+      {mode === 'voice' && (
+        <ListeningScreen
+          key={phase}
+          phase={phase}
+          finalText={heard.final}
+          interimText={heard.interim}
+          onStop={() => recRef.current?.stop()}
+          onClose={closeVoice}
+          onKeyboard={toKeyboard}
+          onCamera={openCamera}
+          onSend={sendHeard}
+        />
       )}
     </div>
   )

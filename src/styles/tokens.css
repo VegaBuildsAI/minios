@@ -357,3 +357,7 @@ body {
 .bubble-pop { animation: bubble-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both; animation-delay: var(--d, 0ms); transform-origin: 70% 0; }
 @keyframes caret { 50% { opacity: 0; } }
 .type-caret { display: inline-block; width: 2px; height: 1em; margin-left: 1px; vertical-align: -0.12em; background: var(--m-brand); animation: caret 0.8s steps(1) infinite; }
+
+/* Asistente: anillo de cuenta regresiva antes de enviar la pregunta dictada */
+@keyframes listen-countdown { from { stroke-dashoffset: 0; } to { stroke-dashoffset: var(--ring-len); } }
+.listen-countdown { animation-name: listen-countdown; animation-timing-function: linear; animation-fill-mode: forwards; }
