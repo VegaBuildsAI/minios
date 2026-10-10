@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Check, CheckCheck, FileText, Loader2, Mic, Send, Sparkles, Square, X } from 'lucide-react'
-import { askAssistant, useAiSpendToday, useApplyProposal, useBusinessSettings, useCaptureStats, useCaptures, useDashboardStats, useProducts } from '@/lib/data'
+import { askAssistant, useApplyProposal, useCaptureStats, useCaptures, useDashboardStats, useProducts } from '@/lib/data'
 import { formatCRC, type Product, type Proposal } from '@/lib/types'
 import { useAuth } from '@/modules/auth/context'
 import { ReceiveInvoice } from '../widgets/ReceiveInvoice'
@@ -123,8 +123,6 @@ export function Assistant() {
   const cancelVoiceRef = useRef(false)
   const { profile } = useAuth()
   const firstName = (profile?.full_name || 'Michael').split(' ')[0]
-  const { data: spendToday = 0 } = useAiSpendToday()
-  const { data: settings } = useBusinessSettings()
   const { data: captureStats } = useCaptureStats()
   const endRef = useRef<HTMLDivElement>(null)
 
@@ -202,7 +200,6 @@ export function Assistant() {
   ]
   const fresh = msgs.length <= 1
   const pending = captureStats?.byStatus.borrador ?? 0
-  const budget = settings?.ai_daily_budget_usd ?? 2
 
   return (
     <div className="mostrador fixed inset-0 z-50 mx-auto flex max-w-[440px] flex-col bg-paper">
@@ -213,12 +210,6 @@ export function Assistant() {
         <div className="min-w-0 flex-1">
           <h1 className="font-display-m text-[1.375rem] leading-tight font-bold text-ink">Asistente</h1>
           <div className="truncate text-[0.8125rem] text-ink-2">Consulta tus datos · vos confirmás cada acción</div>
-        </div>
-        <div
-          title="Gasto de IA hoy"
-          className="tabular-nums flex h-8 shrink-0 items-center rounded-[10px] bg-paper px-2.5 text-[0.75rem] font-semibold text-ink-2"
-        >
-          US${spendToday.toFixed(2)} / {budget.toFixed(2)}
         </div>
       </header>
 

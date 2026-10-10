@@ -7,7 +7,7 @@ import { formatCRC, type MovementReason, type Product } from '@/lib/types'
 function statusOf(st: number, min: number): { label: string; tone: 'teal' | 'amber' | 'rose' } {
   if (st <= 0) return { label: 'Agotado', tone: 'rose' }
   if (st <= min) return { label: 'Bajo', tone: 'amber' }
-  return { label: 'OK', tone: 'teal' }
+  return { label: 'Al día', tone: 'teal' }
 }
 
 const REASONS: { id: MovementReason; label: string; sign: 1 | -1 }[] = [
@@ -17,6 +17,16 @@ const REASONS: { id: MovementReason; label: string; sign: 1 | -1 }[] = [
   { id: 'vencimiento', label: 'Vencimiento', sign: -1 },
   { id: 'ajuste', label: 'Ajuste', sign: 1 },
 ]
+
+const REASON_LABEL: Record<MovementReason, string> = {
+  sale: 'Venta',
+  purchase: 'Compra',
+  entrada: 'Entrada',
+  merma: 'Merma',
+  robo: 'Robo',
+  vencimiento: 'Vencimiento',
+  ajuste: 'Ajuste',
+}
 
 type Filter = 'todos' | 'atencion' | 'ok'
 
@@ -172,7 +182,7 @@ function AdjustSheet({ product, onClose }: { product: Product; onClose: () => vo
             <div className="space-y-1.5">
               {movements.map((m) => (
                 <div key={m.id} className="flex items-center justify-between rounded-xl bg-paper px-3 py-2 text-[0.875rem]">
-                  <span className="capitalize text-ink-2">{m.reason}</span>
+                  <span className="text-ink-2">{REASON_LABEL[m.reason] ?? m.reason}</span>
                   <span className="text-ink-3">{new Date(m.created_at).toLocaleString('es-CR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
                   <span className={`tabular-nums font-semibold ${m.delta < 0 ? 'text-danger' : 'text-brand'}`}>
                     {m.delta > 0 ? '+' : ''}
