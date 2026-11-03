@@ -37,3 +37,19 @@ supabase/functions/.env.*
 
 # Python
 __pycache__/
+
+# Todas las variantes de .env salvo las plantillas
+.env.*
+!.env.example
+!.env.production.example
+
+# Estado local de herramientas
+.wrangler/
+supabase/.branches/
+supabase/.temp/
+.claude/settings.local.json
+
+# Llaves y certificados
+*.pem
+*.key
+*.p12
