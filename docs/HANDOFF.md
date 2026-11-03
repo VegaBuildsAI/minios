@@ -41,7 +41,7 @@ Mini-ERP (PWA) para un minisúper en Costa Rica. Vite 8 + React 19 + TS 6 + Tail
 6. **Auth URLs (usuario):** Supabase → Authentication → URL Configuration: Site URL `https://TU-PROYECTO.pages.dev` y Redirect `https://TU-PROYECTO.pages.dev/app`.
 7. **Usuarios en la nube (usuario):** Authentication → Users → Add user (Auto Confirm). Luego SQL Editor:
    `update public.profiles set role='owner', full_name='…' where id=(select id from auth.users where email='…');`
-   El superadmin es `admin@minios.test` (el usuario ya definió su contraseña en la app). los dueños = owners; **faltan sus correos reales**. La contraseña inicial sugerida quedó escrita en un chat: pedir que la cambien al primer ingreso.
+   El superadmin es `admin@minios.test` (el usuario ya definió su contraseña en la app). Los dueños = owners; **faltan sus correos reales**. La contraseña inicial sugerida quedó escrita en un chat: pedir que la cambien al primer ingreso.
 8. **Datos:** cargar productos reales o pegar `supabase/seed.sql` sin el bloque `auth.users` (catálogo demo).
 9. **Verificación en producción:** abrir el sitio (renderiza, no `text/plain`); login; subir una factura → se lee con IA; preguntar al asistente; aplicar una factura; Config → gasto IA; consola sin errores. Probar desde el celular y **reinstalar la PWA** (desinstalar + instalar) para ver el ícono redondeado.
 10. **Smoke test de seguridad:** con un usuario staff intentar cambiarse el rol → debe fallar con 42501; llamar `ai-assistant` sin sesión → 401.
